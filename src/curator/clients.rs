@@ -14,6 +14,8 @@ const DOWNLOAD_CLIENTS: &str = "/downloadclient";
 
 const TEST_ALL: &str = "/downloadclient/testall";
 
+const SAVED_UNREACHED: &str = "/downloadclient?forceSave=true";
+
 const FIELDS: &str = "fields";
 
 const NAME: &str = "name";
@@ -53,7 +55,7 @@ impl<M: Music> Client for Curator<M> {
     async fn register_download_client(&self, client: &DownloadClient) -> Result<(), Failure> {
         let body = self.download_client_body(client, None)?;
         self.servarr
-            .done(Method::Post, DOWNLOAD_CLIENTS, Some(body))
+            .done(Method::Post, SAVED_UNREACHED, Some(body))
             .await
     }
 
