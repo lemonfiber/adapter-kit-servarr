@@ -38,16 +38,16 @@ fn torrent() -> DownloadClient {
 }
 
 #[tokio::test]
-async fn a_usenet_client_is_posted_as_its_implementation_with_its_key() {
+async fn a_usenet_client_is_saved_as_its_implementation_with_its_key_without_being_reached() {
     let fake = Fake::always(Answer::reply(201, "{}"));
     assert!(television(&fake)
         .register_download_client(&usenet())
         .await
         .is_ok());
     let sent = fake.request();
-    assert!(sent
-        .as_ref()
-        .is_some_and(|one| one.method == Method::Post && one.url == api("/downloadclient")));
+    assert!(sent.as_ref().is_some_and(
+        |one| one.method == Method::Post && one.url == api("/downloadclient?forceSave=true")
+    ));
     assert_eq!(
         sent_body(sent),
         serde_json::json!({
