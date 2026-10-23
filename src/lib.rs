@@ -5,7 +5,6 @@
 pub mod client;
 pub mod credential;
 pub mod curator;
-pub mod endpoint;
 
 #[cfg(test)]
 mod testing;

@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use lemonfiber_adapter_kit::endpoint::form_encoded;
 use lemonfiber_ports::http::Method;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{AddPlan, Added, Catalogue, CatalogueEntry, Failure};
@@ -61,9 +62,7 @@ struct IndexerResource {
 impl<M: Music> Catalogue for Curator<M> {
     async fn lookup(&self, kind: Kind, term: &str) -> Result<Vec<CatalogueEntry>, Failure> {
         let kind = self.filing(kind)?;
-        let query: String = form_urlencoded::Serializer::new(String::new())
-            .append_pair(TERM, term)
-            .finish();
+        let query = form_encoded(&[(TERM, term)]);
         let results: Vec<LookupResult> = self
             .servarr
             .read(
@@ -94,7 +93,7 @@ impl<M: Music> Catalogue for Curator<M> {
                 quality_profile,
             })
             .ok_or_else(|| {
-                self.servarr.endpoint().unsupported(&format!(
+                self.servarr.unsupported(&format!(
                     "{} has no root folder or no quality profile configured yet",
                     kind.noun()
                 ))

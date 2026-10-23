@@ -68,7 +68,7 @@ pub trait Music: Send + Sync {
     ///
     /// Why the format was not applied; by default, that the curator files no music.
     async fn apply(&self, servarr: &Servarr, _format: Format) -> Result<(), Failure> {
-        Err(servarr.endpoint().unsupported(FILES_NO_MUSIC))
+        Err(servarr.unsupported(FILES_NO_MUSIC))
     }
 
     /// The fields `folder` is registered with beside its path.
@@ -123,7 +123,6 @@ impl<M: Music> Curator<M> {
         } else {
             Err(self
                 .servarr
-                .endpoint()
                 .unsupported(&format!("it files no {}", kind.noun())))
         }
     }
@@ -134,7 +133,6 @@ impl<M: Music> Curator<M> {
         } else {
             Err(self
                 .servarr
-                .endpoint()
                 .unsupported(&format!("it holds no {}", record.plural())))
         }
     }

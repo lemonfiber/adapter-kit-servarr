@@ -133,5 +133,5 @@ async fn a_curator_of_music_answers_what_its_music_does() {
         sent_body(fake.request()),
         serde_json::json!({ "name": "music", "path": "/data/media/music" })
     );
-    assert_eq!(curator.servarr().endpoint().service(), "sonarr");
+    assert_eq!(curator.servarr().service(), "sonarr");
 }

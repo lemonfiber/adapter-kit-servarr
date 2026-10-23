@@ -3,14 +3,22 @@
 
 use std::sync::Arc;
 
-use lemonfiber_ports::http::{Http, Method, Request, Response};
+use lemonfiber_adapter_kit::credential::Holding;
+use lemonfiber_adapter_kit::endpoint::Endpoint;
+use lemonfiber_ports::http::{Http, Method, Request, Response, JSON};
 use lemonfiber_ports::service::{Failure, Identity};
 use serde::Deserialize;
 
-use crate::credential::Holding;
-use crate::endpoint::Endpoint;
+/// The header a Servarr service reads its API key from.
+pub const API_KEY_HEADER: &str = "X-Api-Key";
+
+const CONTENT_TYPE: &str = "Content-Type";
 
 const NOT_SERVED: u16 = 404;
+
+const SAID_PER_FAILURE: &str = "errorMessage";
+
+const SAID_BETWEEN: &str = "; ";
 
 const PING: &str = "/ping";
 
@@ -19,6 +27,7 @@ const STATUS: &str = "/system/status";
 /// A client for one Servarr service, presenting the key `held` supplies on every call.
 pub struct Servarr {
     endpoint: Endpoint,
+    service: String,
     held: Arc<dyn Holding>,
     version: u32,
 }
@@ -44,8 +53,10 @@ impl Servarr {
         service: impl Into<String>,
         version: u32,
     ) -> Self {
+        let service = service.into();
         Self {
-            endpoint: Endpoint::new(http, base, service),
+            endpoint: Endpoint::new(http, base, service.clone()),
+            service,
             held,
             version,
         }
@@ -55,6 +66,21 @@ impl Servarr {
     #[must_use]
     pub fn endpoint(&self) -> &Endpoint {
         &self.endpoint
+    }
+
+    /// The service every failure is blamed on.
+    #[must_use]
+    pub fn service(&self) -> &str {
+        &self.service
+    }
+
+    /// Something the service does not do, for `detail`.
+    #[must_use]
+    pub fn unsupported(&self, detail: &str) -> Failure {
+        Failure::Unsupported {
+            service: self.service.clone(),
+            detail: detail.to_owned(),
+        }
     }
 
     /// Whether the service answers what it answers without a key.
@@ -76,7 +102,7 @@ impl Servarr {
         self.held.key().map_err(|why| {
             self.endpoint.refused(&format!(
                 "this adapter holds no key for {}: {why}",
-                self.endpoint.service()
+                self.service
             ))
         })
     }
@@ -94,20 +120,25 @@ impl Servarr {
         body: Option<String>,
     ) -> Result<Response, Failure> {
         let key = self.key()?;
-        let request = self.endpoint.keyed_request(
+        let mut headers = vec![(API_KEY_HEADER.to_owned(), key)];
+        if body.is_some() {
+            headers.push((CONTENT_TYPE.to_owned(), JSON.to_owned()));
+        }
+        let request = Request {
             method,
-            &format!("/api/v{}{path}", self.version),
-            &key,
+            url: self.endpoint.url(&format!("/api/v{}{path}", self.version)),
+            headers,
             body,
-        );
+            pinned: None,
+        };
         let response = self.endpoint.send(&request).await?;
         if response.status == NOT_SERVED {
-            return Err(self.endpoint.unsupported(&format!(
+            return Err(self.unsupported(&format!(
                 "there is no /api/v{}{path}; it may be a release this adapter does not speak",
                 self.version
             )));
         }
-        Ok(response)
+        Ok(said_as_one(response))
     }
 
     /// `path` under the versioned API asked with `method` and `body`, and taken.
@@ -164,6 +195,23 @@ impl Servarr {
             version: status.version,
         })
     }
+}
+
+/// A refusal whose body lists Servarr's validation failures, read as one message of
+/// their words joined, so the refusal carries them and none of the values beside them.
+fn said_as_one(mut response: Response) -> Response {
+    if response.is_success() {
+        return response;
+    }
+    if let Ok(serde_json::Value::Array(failures)) = serde_json::from_str(&response.body) {
+        let said = failures
+            .iter()
+            .filter_map(|failure| failure.get(SAID_PER_FAILURE)?.as_str())
+            .collect::<Vec<_>>()
+            .join(SAID_BETWEEN);
+        response.body = serde_json::json!({ "message": said }).to_string();
+    }
+    response
 }
 
 #[cfg(test)]
