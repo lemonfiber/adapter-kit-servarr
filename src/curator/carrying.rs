@@ -58,7 +58,7 @@ impl<M: Music> Carrying for Curator<M> {
     async fn carry(&self, kind: Record, item: &Carried) -> Result<(), Failure> {
         let kind = self.holding(kind)?;
         let Ok(Value::Object(mut body)) = serde_json::from_str::<Value>(&item.rest) else {
-            return Err(self.servarr.endpoint().unsupported(&format!(
+            return Err(self.servarr.unsupported(&format!(
                 "a carried record of {} could not be read back",
                 kind.plural()
             )));
@@ -104,7 +104,6 @@ impl<M: Music> Curator<M> {
             .map(|(id, _)| id)
             .ok_or_else(|| {
                 self.servarr
-                    .endpoint()
                     .unsupported(&format!("no quality profile called {wanted}"))
             })
     }

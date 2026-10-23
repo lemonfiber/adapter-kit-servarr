@@ -182,7 +182,7 @@ impl<M: Music> Curator<M> {
             .iter()
             .find(|filed| filed.spoken.name() == client.protocol.0)
         else {
-            return Err(self.servarr.endpoint().unsupported(&format!(
+            return Err(self.servarr.unsupported(&format!(
                 "it files no download client spoken to as {}",
                 client.protocol.0
             )));

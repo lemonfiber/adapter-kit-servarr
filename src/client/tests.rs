@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
+use lemonfiber_adapter_kit::credential::Holding;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::http::Method;
 use lemonfiber_ports::service::Failure;
 
-use super::Servarr;
-use crate::credential::Holding;
-use crate::endpoint::API_KEY_HEADER;
+use super::{Servarr, API_KEY_HEADER};
 use crate::testing::{api, asked, servarr, BASE, KEY, SERVICE};
 
 struct Nothing;
@@ -89,6 +88,38 @@ async fn a_write_it_refuses_is_refused() {
 }
 
 #[tokio::test]
+async fn every_validation_failure_is_said_and_nothing_beside_it() {
+    let fake = Fake::always(Answer::reply(
+        400,
+        r#"[{"propertyName":"Path","errorMessage":"Path is required","attemptedValue":"a-fixture-key"},{"errorMessage":"Name is taken"},{"severity":"error"}]"#,
+    ));
+    assert!(matches!(
+        servarr(&fake).done(Method::Post, "/rootfolder", None).await,
+        Err(Failure::Refused { detail, .. })
+            if detail == "HTTP 400: Path is required; Name is taken"
+    ));
+}
+
+#[tokio::test]
+async fn a_refusal_in_its_own_message_is_said_as_it_is() {
+    let fake = Fake::always(Answer::reply(409, r#"{"message":"Already exists"}"#));
+    assert!(matches!(
+        servarr(&fake).done(Method::Post, "/series", None).await,
+        Err(Failure::Refused { detail, .. }) if detail == "HTTP 409: Already exists"
+    ));
+}
+
+#[tokio::test]
+async fn a_list_it_answers_is_read_as_it_is() {
+    let fake = Fake::always(Answer::reply(200, r#"[{"errorMessage":"kept"}]"#));
+    let read: Vec<serde_json::Value> = servarr(&fake)
+        .read("/health", "the health")
+        .await
+        .unwrap_or_default();
+    assert_eq!(read, [serde_json::json!({ "errorMessage": "kept" })]);
+}
+
+#[tokio::test]
 async fn its_identity_is_its_instance_name_or_its_app_name_and_its_version() {
     let fake = Fake::always(Answer::reply(
         200,
@@ -134,6 +165,6 @@ async fn an_unreadable_status_names_what_could_not_be_read() {
 }
 
 #[test]
-fn its_endpoint_names_the_service() {
-    assert_eq!(servarr(&Fake::silent()).endpoint().service(), SERVICE);
+fn it_names_the_service_every_failure_is_blamed_on() {
+    assert_eq!(servarr(&Fake::silent()).service(), SERVICE);
 }
