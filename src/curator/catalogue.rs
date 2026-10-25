@@ -93,7 +93,7 @@ impl<M: Music> Catalogue for Curator<M> {
                 quality_profile,
             })
             .ok_or_else(|| {
-                self.servarr.unsupported(&format!(
+                self.servarr.endpoint().refused(&format!(
                     "{} has no root folder or no quality profile configured yet",
                     kind.noun()
                 ))

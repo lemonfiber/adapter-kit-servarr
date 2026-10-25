@@ -77,7 +77,7 @@ async fn a_curator_with_no_folder_or_no_profile_has_no_plan() {
     ]);
     assert!(matches!(
         television(&fake).add_plan(Kind::Tv).await,
-        Err(Failure::Unsupported { detail, .. })
+        Err(Failure::Refused { detail, .. })
             if detail == "series has no root folder or no quality profile configured yet"
     ));
 }
