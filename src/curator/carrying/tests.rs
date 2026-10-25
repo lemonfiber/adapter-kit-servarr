@@ -110,7 +110,7 @@ async fn a_profile_this_service_lacks_is_refused_rather_than_guessed() {
     let refused = music(&fake)
         .carry(Record::Artist, &following(Some("Lossless"), "{}"))
         .await;
-    assert!(matches!(refused, Err(Failure::Unsupported { detail, .. })
+    assert!(matches!(refused, Err(Failure::Refused { detail, .. })
         if detail == "no quality profile called Lossless"));
     assert_eq!(asked(&fake), [api("/qualityprofile")]);
 }
@@ -121,7 +121,7 @@ async fn a_record_that_cannot_be_read_back_is_not_put_to_the_service() {
     let refused = music(&fake)
         .carry(Record::Artist, &following(None, "[1]"))
         .await;
-    assert!(matches!(refused, Err(Failure::Unsupported { detail, .. })
+    assert!(matches!(refused, Err(Failure::Refused { detail, .. })
         if detail == "a carried record of artists could not be read back"));
     assert!(asked(&fake).is_empty());
 }
