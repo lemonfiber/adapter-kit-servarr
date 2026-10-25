@@ -11,16 +11,16 @@ publish = false
 
 [dependencies]
 async-trait = "0.1"
-lemonfiber-adapter-kit = { git = "https://github.com/lemonfiber/lemonfiber", rev = "aab38c1b02069557a5d4656109783a32fadcfda5" }
-lemonfiber-contract = { git = "https://github.com/lemonfiber/lemonfiber", rev = "aab38c1b02069557a5d4656109783a32fadcfda5" }
-lemonfiber-error = { git = "https://github.com/lemonfiber/lemonfiber", rev = "aab38c1b02069557a5d4656109783a32fadcfda5" }
-lemonfiber-manifest = { git = "https://github.com/lemonfiber/lemonfiber", rev = "aab38c1b02069557a5d4656109783a32fadcfda5" }
-lemonfiber-ports = { git = "https://github.com/lemonfiber/lemonfiber", rev = "aab38c1b02069557a5d4656109783a32fadcfda5" }
+lemonfiber-adapter-kit = { git = "https://github.com/lemonfiber/lemonfiber", rev = "7c1274003776ddf7b87fde9d352c110ce3917846" }
+lemonfiber-contract = { git = "https://github.com/lemonfiber/lemonfiber", rev = "7c1274003776ddf7b87fde9d352c110ce3917846" }
+lemonfiber-error = { git = "https://github.com/lemonfiber/lemonfiber", rev = "7c1274003776ddf7b87fde9d352c110ce3917846" }
+lemonfiber-manifest = { git = "https://github.com/lemonfiber/lemonfiber", rev = "7c1274003776ddf7b87fde9d352c110ce3917846" }
+lemonfiber-ports = { git = "https://github.com/lemonfiber/lemonfiber", rev = "7c1274003776ddf7b87fde9d352c110ce3917846" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 [dev-dependencies]
-lemonfiber-fixtures = { git = "https://github.com/lemonfiber/lemonfiber", rev = "aab38c1b02069557a5d4656109783a32fadcfda5" }
+lemonfiber-fixtures = { git = "https://github.com/lemonfiber/lemonfiber", rev = "7c1274003776ddf7b87fde9d352c110ce3917846" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [lints.rust]
