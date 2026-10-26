@@ -35,6 +35,33 @@ async fn an_upgrade_search_is_posted_as_the_command_for_the_kind_it_files() {
 }
 
 #[tokio::test]
+async fn it_is_wanting_while_its_wanted_list_holds_a_record_and_searches_nothing() {
+    let fake = Fake::always(Answer::reply(
+        200,
+        r#"{"page":1,"pageSize":1,"totalRecords":3,"records":[{"id":7}]}"#,
+    ));
+    assert_eq!(television(&fake).wanting().await.ok(), Some(true));
+    assert_eq!(asked(&fake), [api("/wanted/missing?page=1&pageSize=1")]);
+    assert!(fake.requests().iter().all(|one| one.method == Method::Get));
+    for empty in [
+        r#"{"page":1,"pageSize":1,"totalRecords":0,"records":[]}"#,
+        "{}",
+    ] {
+        let fake = Fake::always(Answer::reply(200, empty));
+        assert_eq!(music(&fake).wanting().await.ok(), Some(false));
+    }
+}
+
+#[tokio::test]
+async fn a_wanted_list_it_cannot_read_is_a_failure() {
+    let fake = Fake::always(Answer::reply(200, "[1]"));
+    assert!(matches!(
+        films(&fake).wanting().await,
+        Err(Failure::Refused { .. })
+    ));
+}
+
+#[tokio::test]
 async fn a_kind_it_does_not_file_is_refused_before_anything_is_asked() {
     let fake = Fake::always(Answer::reply(200, "[]"));
     assert!(unsupported(

@@ -25,6 +25,8 @@ const QUALITY_PROFILES: &str = "/qualityprofile";
 
 const ROOT_FOLDERS: &str = "/rootfolder";
 
+const WANTED: &str = "/wanted/missing?page=1&pageSize=1";
+
 fn newest_history(size: usize) -> String {
     format!("/history?page=1&pageSize={size}&sortKey=date&sortDirection=descending")
 }
@@ -145,6 +147,17 @@ impl<M: Music> Maintenance for Curator<M> {
         let body = serde_json::json!({ "name": kind.upgrade_command() }).to_string();
         self.servarr.done(Method::Post, COMMAND, Some(body)).await
     }
+
+    async fn wanting(&self) -> Result<bool, Failure> {
+        let wanted: Wanted = self.servarr.read(WANTED, "the wanted list").await?;
+        Ok(!wanted.records.is_empty())
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct Wanted {
+    #[serde(default)]
+    records: Vec<serde_json::Value>,
 }
 
 #[async_trait]
