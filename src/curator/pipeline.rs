@@ -10,7 +10,7 @@ use serde::Deserialize;
 
 use super::kind::Shape as _;
 use super::queue::is_stuck;
-use super::{newest_history, Curator, Music};
+use super::{newest_history, Curator, Music, THE_EPISODES, THE_HISTORY, THE_LIBRARY};
 
 const WITH_ITEMS: &str = "&includeSeries=true&includeMovie=true";
 
@@ -69,7 +69,7 @@ impl<M: Music> Pipeline for Curator<M> {
         let kind = self.filing(kind)?;
         let items: Vec<LibraryItem> = self
             .servarr
-            .read(&format!("/{}", kind.library_endpoint()), "the library")
+            .read(&format!("/{}", kind.library_endpoint()), THE_LIBRARY)
             .await?;
         Ok(items
             .into_iter()
@@ -102,7 +102,7 @@ impl<M: Music> Pipeline for Curator<M> {
                     newest_history(HISTORY_HORIZON),
                     kind.history_filter()
                 ),
-                "the history",
+                THE_HISTORY,
             )
             .await?;
         Ok(page
@@ -146,10 +146,7 @@ impl<M: Music> Pipeline for Curator<M> {
         let season = season.map_or_else(String::new, |number| format!("&seasonNumber={number}"));
         let parts: Vec<PartResource> = self
             .servarr
-            .read(
-                &format!("/{endpoint}?{filter}={id}{season}"),
-                "the episodes",
-            )
+            .read(&format!("/{endpoint}?{filter}={id}{season}"), THE_EPISODES)
             .await?;
         Ok(parts
             .into_iter()

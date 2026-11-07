@@ -120,6 +120,50 @@ async fn a_list_it_answers_is_read_as_it_is() {
 }
 
 #[tokio::test]
+async fn what_it_holds_at_a_path_is_found_and_read() {
+    let fake = Fake::always(Answer::reply(400, r#"[{"errorMessage":"Bad id"}]"#));
+    assert!(matches!(
+        servarr(&fake).find::<serde_json::Value>("/series/4", "the title").await,
+        Err(Failure::Refused { detail, .. }) if detail == "HTTP 400: Bad id"
+    ));
+
+    let fake = Fake::always(Answer::reply(200, r#"{"id":4}"#));
+    let found: Option<serde_json::Value> = servarr(&fake)
+        .find("/series/4", "the title")
+        .await
+        .unwrap_or_default();
+    assert_eq!(found, Some(serde_json::json!({ "id": 4 })));
+    assert_eq!(asked(&fake), [api("/series/4")]);
+}
+
+#[tokio::test]
+async fn nothing_held_at_a_path_is_none_while_its_versioned_prefix_is_served() {
+    let fake = Fake::by_path(vec![
+        ("/series/4", Answer::reply(404, r#"{"title":"Not Found"}"#)),
+        ("/system/status", Answer::reply(200, "{}")),
+    ]);
+    let found: Result<Option<serde_json::Value>, Failure> =
+        servarr(&fake).find("/series/4", "the title").await;
+    assert!(matches!(found, Ok(None)));
+    assert_eq!(asked(&fake), [api("/series/4"), api("/system/status")]);
+
+    let fake = Fake::always(Answer::reply(404, ""));
+    assert!(matches!(
+        servarr(&fake).find::<serde_json::Value>("/series/4", "the title").await,
+        Err(Failure::Unsupported { detail, .. })
+            if detail == "there is no /api/v3/series/4; it may be a release this adapter does not speak"
+    ));
+
+    let fake = Fake::by_path(vec![("/series/4", Answer::reply(404, ""))]);
+    assert!(matches!(
+        servarr(&fake)
+            .find::<serde_json::Value>("/series/4", "the title")
+            .await,
+        Err(Failure::Unavailable { .. })
+    ));
+}
+
+#[tokio::test]
 async fn its_identity_is_its_instance_name_or_its_app_name_and_its_version() {
     let fake = Fake::always(Answer::reply(
         200,

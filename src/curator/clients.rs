@@ -8,7 +8,9 @@ use lemonfiber_ports::service::{
 use lemonfiber_ports::Client;
 
 use super::wire::{ClientResource, FolderResource, ProfileResource, TestResource};
-use super::{Curator, Music, QUALITY_PROFILES, ROOT_FOLDERS};
+use super::{
+    Curator, Music, QUALITY_PROFILES, ROOT_FOLDERS, THE_QUALITY_PROFILES, THE_ROOT_FOLDERS,
+};
 
 const DOWNLOAD_CLIENTS: &str = "/downloadclient";
 
@@ -134,7 +136,7 @@ impl<M: Music> Client for Curator<M> {
 
     async fn root_folders(&self) -> Result<Vec<RegisteredFolder>, Failure> {
         let folders: Vec<FolderResource> =
-            self.servarr.read(ROOT_FOLDERS, "the root folders").await?;
+            self.servarr.read(ROOT_FOLDERS, THE_ROOT_FOLDERS).await?;
         Ok(folders
             .into_iter()
             .map(|folder| RegisteredFolder {
@@ -147,7 +149,7 @@ impl<M: Music> Client for Curator<M> {
     async fn quality_profiles(&self) -> Result<Vec<QualityProfile>, Failure> {
         let held: Vec<ProfileResource> = self
             .servarr
-            .read(QUALITY_PROFILES, "the quality profiles")
+            .read(QUALITY_PROFILES, THE_QUALITY_PROFILES)
             .await?;
         Ok(held
             .into_iter()
