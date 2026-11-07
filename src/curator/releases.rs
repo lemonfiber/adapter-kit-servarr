@@ -4,7 +4,7 @@ use lemonfiber_ports::service::{Failure, QualityReleases, ReleaseProbe};
 use serde::Deserialize;
 
 use super::kind::Shape as _;
-use super::{Curator, Music};
+use super::{Curator, Music, THE_WANTED_LIST};
 
 const FIRST_WANTED: &str = "/wanted/missing?page=1&pageSize=1";
 
@@ -29,7 +29,7 @@ struct ReleaseResource {
 impl<M: Music> QualityReleases for Curator<M> {
     async fn probe_releases(&self, kind: Kind) -> Result<ReleaseProbe, Failure> {
         let kind = self.filing(kind)?;
-        let wanted: Wanted = self.servarr.read(FIRST_WANTED, "the wanted list").await?;
+        let wanted: Wanted = self.servarr.read(FIRST_WANTED, THE_WANTED_LIST).await?;
         let Some(first) = wanted.records.first() else {
             return Ok(ReleaseProbe::NothingWanted);
         };

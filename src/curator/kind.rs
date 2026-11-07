@@ -16,6 +16,14 @@ pub(crate) trait Shape: Sized {
     fn search_option(self) -> &'static str;
 
     fn only_field(self) -> (&'static str, serde_json::Value);
+
+    fn catalogue(self) -> &'static str;
+
+    fn exclusion_param(self) -> &'static str;
+
+    fn title_search(self, id: i64) -> serde_json::Value;
+
+    fn queue_detail(self) -> &'static str;
 }
 
 impl Shape for Kind {
@@ -75,6 +83,34 @@ impl Shape for Kind {
                 "minimumAvailability",
                 serde_json::Value::String("released".to_owned()),
             ),
+        }
+    }
+
+    fn catalogue(self) -> &'static str {
+        match self {
+            Kind::Tv => "tvdb",
+            Kind::Movies => "tmdb",
+        }
+    }
+
+    fn exclusion_param(self) -> &'static str {
+        match self {
+            Kind::Tv => "addImportListExclusion",
+            Kind::Movies => "addImportExclusion",
+        }
+    }
+
+    fn title_search(self, id: i64) -> serde_json::Value {
+        match self {
+            Kind::Tv => serde_json::json!({ "name": "MissingEpisodeSearch", "seriesId": id }),
+            Kind::Movies => serde_json::json!({ "name": "MoviesSearch", "movieIds": [id] }),
+        }
+    }
+
+    fn queue_detail(self) -> &'static str {
+        match self {
+            Kind::Tv => "&includeEpisode=true",
+            Kind::Movies => "",
         }
     }
 }

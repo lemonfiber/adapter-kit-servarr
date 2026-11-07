@@ -6,7 +6,7 @@ use lemonfiber_ports::service::{Failure, Queue, Queued, Queues};
 use serde::Deserialize;
 
 use super::wire::{QueueRecord, QueueResource};
-use super::{newest_history, Curator, Music};
+use super::{newest_history, Curator, Music, THE_HISTORY};
 
 const QUEUE_PAGE: usize = 200;
 
@@ -90,7 +90,7 @@ impl<M: Music> Curator<M> {
 
     async fn grabs(&self) -> BTreeMap<i64, u32> {
         self.servarr
-            .read::<HistoryPage>(&newest_history(HISTORY_PAGE), "the history")
+            .read::<HistoryPage>(&newest_history(HISTORY_PAGE), THE_HISTORY)
             .await
             .map(|page| counted(&page.records))
             .unwrap_or_default()

@@ -119,6 +119,19 @@ impl Servarr {
         path: &str,
         body: Option<String>,
     ) -> Result<Response, Failure> {
+        let response = self.sent(method, path, body).await?;
+        if response.status == NOT_SERVED {
+            return Err(self.not_served(path));
+        }
+        Ok(said_as_one(response))
+    }
+
+    async fn sent(
+        &self,
+        method: Method,
+        path: &str,
+        body: Option<String>,
+    ) -> Result<Response, Failure> {
         let key = self.key()?;
         let mut headers = vec![(API_KEY_HEADER.to_owned(), key)];
         if body.is_some() {
@@ -131,14 +144,14 @@ impl Servarr {
             body,
             pinned: None,
         };
-        let response = self.endpoint.send(&request).await?;
-        if response.status == NOT_SERVED {
-            return Err(self.unsupported(&format!(
-                "there is no /api/v{}{path}; it may be a release this adapter does not speak",
-                self.version
-            )));
-        }
-        Ok(said_as_one(response))
+        self.endpoint.send(&request).await
+    }
+
+    fn not_served(&self, path: &str) -> Failure {
+        self.unsupported(&format!(
+            "there is no /api/v{}{path}; it may be a release this adapter does not speak",
+            self.version
+        ))
     }
 
     /// `path` under the versioned API asked with `method` and `body`, and taken.
@@ -170,6 +183,32 @@ impl Servarr {
         let response = self.ask(Method::Get, path, None).await?;
         self.endpoint
             .decode(&response, &format!("{what} could not be read"))
+    }
+
+    /// What `path` under the versioned API holds, read as `T`, or none where the service
+    /// holds nothing there while its versioned prefix is served; `what` names it where it
+    /// cannot be read.
+    ///
+    /// # Errors
+    ///
+    /// What [`Servarr::ask`] refuses, or an answer not in the shape of `T`.
+    pub async fn find<T: serde::de::DeserializeOwned>(
+        &self,
+        path: &str,
+        what: &str,
+    ) -> Result<Option<T>, Failure> {
+        let response = self.sent(Method::Get, path, None).await?;
+        if response.status == NOT_SERVED {
+            let status = self.sent(Method::Get, STATUS, None).await?;
+            return if status.status == NOT_SERVED {
+                Err(self.not_served(path))
+            } else {
+                Ok(None)
+            };
+        }
+        self.endpoint
+            .decode(&said_as_one(response), &format!("{what} could not be read"))
+            .map(Some)
     }
 
     /// Who the service is and which release it runs.

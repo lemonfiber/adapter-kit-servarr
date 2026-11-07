@@ -6,7 +6,7 @@ use lemonfiber_ports::service::{Carried, Carrying, Failure, Record};
 use serde_json::{Map, Value};
 
 use super::wire::ProfileResource;
-use super::{Curator, Music, QUALITY_PROFILES};
+use super::{Curator, Music, QUALITY_PROFILES, THE_QUALITY_PROFILES};
 
 const PROFILE_FIELD: &str = "qualityProfileId";
 
@@ -87,7 +87,7 @@ impl<M: Music> Curator<M> {
     async fn numbered_profiles(&self) -> Result<BTreeMap<u64, String>, Failure> {
         let held: Vec<ProfileResource> = self
             .servarr
-            .read(QUALITY_PROFILES, "the quality profiles")
+            .read(QUALITY_PROFILES, THE_QUALITY_PROFILES)
             .await?;
         Ok(held
             .into_iter()

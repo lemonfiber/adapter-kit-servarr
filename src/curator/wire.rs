@@ -50,6 +50,27 @@ pub(crate) struct QueueRecord {
     pub(crate) series: Option<TitledResource>,
     #[serde(default)]
     pub(crate) movie: Option<TitledResource>,
+    #[serde(default)]
+    pub(crate) status: String,
+    #[serde(default)]
+    pub(crate) size: Option<serde_json::Number>,
+    #[serde(default)]
+    pub(crate) sizeleft: Option<serde_json::Number>,
+    #[serde(default)]
+    pub(crate) estimated_completion_time: Option<String>,
+    #[serde(default)]
+    pub(crate) episode: Option<EpisodeResource>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct EpisodeResource {
+    #[serde(default)]
+    pub(crate) season_number: u32,
+    #[serde(default)]
+    pub(crate) episode_number: u32,
+    #[serde(default)]
+    pub(crate) title: String,
 }
 
 #[derive(Deserialize)]
@@ -67,11 +88,14 @@ impl QueueRecord {
     }
 
     pub(crate) fn is_for(&self, kind: Kind, id: i64) -> bool {
-        let owner = match kind {
+        self.owner(kind) == Some(id)
+    }
+
+    pub(crate) const fn owner(&self, kind: Kind) -> Option<i64> {
+        match kind {
             Kind::Tv => self.series_id,
             Kind::Movies => self.movie_id,
-        };
-        owner == Some(id)
+        }
     }
 
     pub(crate) fn item_title(&self, kind: Kind) -> Option<String> {

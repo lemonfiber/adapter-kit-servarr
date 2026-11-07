@@ -4,10 +4,14 @@ use lemonfiber_ports::http::Method;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{AddPlan, Added, Catalogue, CatalogueEntry, Failure};
 use serde::Deserialize;
+use serde_json::{json, Map, Value};
 
 use super::kind::Shape as _;
 use super::wire::ProfileResource;
-use super::{Curator, Music, QUALITY_PROFILES, ROOT_FOLDERS};
+use super::{
+    Curator, Music, MONITORED, QUALITY_PROFILES, ROOT_FOLDERS, THE_CATALOGUE, THE_QUALITY_PROFILES,
+    THE_ROOT_FOLDERS,
+};
 
 const INDEXERS: &str = "/indexer";
 
@@ -67,7 +71,7 @@ impl<M: Music> Catalogue for Curator<M> {
             .servarr
             .read(
                 &format!("/{}/lookup?{query}", kind.library_endpoint()),
-                "the catalogue",
+                THE_CATALOGUE,
             )
             .await?;
         Ok(results
@@ -79,10 +83,10 @@ impl<M: Music> Catalogue for Curator<M> {
     async fn add_plan(&self, kind: Kind) -> Result<AddPlan, Failure> {
         let kind = self.filing(kind)?;
         let folders: Vec<RootFolderResource> =
-            self.servarr.read(ROOT_FOLDERS, "the root folders").await?;
+            self.servarr.read(ROOT_FOLDERS, THE_ROOT_FOLDERS).await?;
         let profiles: Vec<ProfileResource> = self
             .servarr
-            .read(QUALITY_PROFILES, "the quality profiles")
+            .read(QUALITY_PROFILES, THE_QUALITY_PROFILES)
             .await?;
         let root_folder = folders.into_iter().map(|folder| folder.path).next();
         let quality_profile = profiles.into_iter().map(|profile| profile.id).next();
@@ -107,34 +111,12 @@ impl<M: Music> Catalogue for Curator<M> {
         plan: &AddPlan,
     ) -> Result<Added, Failure> {
         let kind = self.filing(kind)?;
-        let (only, value) = kind.only_field();
-        let fields: serde_json::Map<String, serde_json::Value> = [
-            ("title", serde_json::json!(entry.title)),
-            ("qualityProfileId", serde_json::json!(plan.quality_profile)),
-            ("rootFolderPath", serde_json::json!(plan.root_folder)),
-            ("monitored", serde_json::json!(true)),
-            (
-                "addOptions",
-                serde_json::json!({ kind.search_option(): true }),
-            ),
-            (kind.reference_field(), serde_json::json!(entry.reference)),
-            (only, value),
-        ]
-        .into_iter()
-        .map(|(at, value)| (at.to_owned(), value))
-        .collect();
-        let response = self
-            .servarr
-            .ask(
-                Method::Post,
-                &format!("/{}", kind.library_endpoint()),
-                Some(serde_json::Value::Object(fields).to_string()),
+        let added: LookupResult = self
+            .post_addition(
+                kind,
+                addition(kind, &entry.title, entry.reference, plan, true),
             )
             .await?;
-        let added: LookupResult = self
-            .servarr
-            .endpoint()
-            .decode(&response, "the service did not say what it took on")?;
         Ok(Added {
             id: added.id,
             title: added.title,
@@ -148,6 +130,48 @@ impl<M: Music> Catalogue for Curator<M> {
             .filter(|indexer| indexer.enable_automatic_search || indexer.enable_interactive_search)
             .count())
     }
+}
+
+impl<M: Music> Curator<M> {
+    pub(super) async fn post_addition<T: serde::de::DeserializeOwned>(
+        &self,
+        kind: Kind,
+        fields: Map<String, Value>,
+    ) -> Result<T, Failure> {
+        let response = self
+            .servarr
+            .ask(
+                Method::Post,
+                &format!("/{}", kind.library_endpoint()),
+                Some(Value::Object(fields).to_string()),
+            )
+            .await?;
+        self.servarr
+            .endpoint()
+            .decode(&response, "the service did not say what it took on")
+    }
+}
+
+pub(super) fn addition(
+    kind: Kind,
+    title: &str,
+    reference: i64,
+    plan: &AddPlan,
+    search: bool,
+) -> Map<String, Value> {
+    let (only, value) = kind.only_field();
+    [
+        ("title", json!(title)),
+        ("qualityProfileId", json!(plan.quality_profile)),
+        ("rootFolderPath", json!(plan.root_folder)),
+        (MONITORED, json!(true)),
+        ("addOptions", json!({ kind.search_option(): search })),
+        (kind.reference_field(), json!(reference)),
+        (only, value),
+    ]
+    .into_iter()
+    .map(|(at, value)| (at.to_owned(), value))
+    .collect()
 }
 
 #[cfg(test)]

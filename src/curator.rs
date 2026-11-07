@@ -10,6 +10,7 @@ use crate::client::Servarr;
 mod carrying;
 mod catalogue;
 mod clients;
+mod fulfilling;
 mod importing;
 mod kind;
 mod pipeline;
@@ -20,6 +21,22 @@ mod wire;
 use kind::Shape as _;
 
 const COMMAND: &str = "/command";
+
+const MONITORED: &str = "monitored";
+
+const THE_CATALOGUE: &str = "the catalogue";
+
+const THE_EPISODES: &str = "the episodes";
+
+const THE_HISTORY: &str = "the history";
+
+const THE_LIBRARY: &str = "the library";
+
+const THE_QUALITY_PROFILES: &str = "the quality profiles";
+
+const THE_ROOT_FOLDERS: &str = "the root folders";
+
+const THE_WANTED_LIST: &str = "the wanted list";
 
 const QUALITY_PROFILES: &str = "/qualityprofile";
 
@@ -149,7 +166,7 @@ impl<M: Music> Maintenance for Curator<M> {
     }
 
     async fn wanting(&self) -> Result<bool, Failure> {
-        let wanted: Wanted = self.servarr.read(WANTED, "the wanted list").await?;
+        let wanted: Wanted = self.servarr.read(WANTED, THE_WANTED_LIST).await?;
         Ok(!wanted.records.is_empty())
     }
 }
