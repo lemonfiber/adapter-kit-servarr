@@ -28,6 +28,7 @@ pub(super) fn downloading(kind: Kind, record: QueueRecord) -> Option<Downloading
             .map(jiff::Timestamp::as_second),
         state,
         download_id: record.download_id.filter(|id| !id.is_empty()),
+        queued: record.id,
         episode: record.episode.map(|episode| DownloadedEpisode {
             season: episode.season_number,
             number: episode.episode_number,
