@@ -29,6 +29,8 @@ pub(crate) struct QueueResource {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct QueueRecord {
     #[serde(default)]
+    pub(crate) id: Option<i64>,
+    #[serde(default)]
     pub(crate) title: Option<String>,
     #[serde(default)]
     pub(crate) error_message: Option<String>,

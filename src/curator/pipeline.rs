@@ -165,16 +165,22 @@ impl<M: Music> Pipeline for Curator<M> {
         let kind = self.filing(kind)?;
         let records = self.queue_pages(WITH_ITEMS).await?;
         let mut seen = BTreeSet::new();
-        Ok(records
+        let mut stuck = Vec::new();
+        for (title, record) in records
             .iter()
             .filter(|record| is_stuck(&record.tracked_download_status))
             .filter_map(|record| record.item_title(kind).map(|title| (title, record)))
             .filter(|(title, _)| seen.insert(title.clone()))
-            .map(|(title, record)| StuckItem {
+        {
+            stuck.push(StuckItem {
                 title,
                 stage: staged(&record.tracked_download_state),
-            })
-            .collect())
+                queued: record.id,
+                title_id: record.owner(kind),
+                release: self.release_of(record).await?,
+            });
+        }
+        Ok(stuck)
     }
 }
 

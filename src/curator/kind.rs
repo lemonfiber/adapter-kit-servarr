@@ -9,6 +9,8 @@ pub(crate) trait Shape: Sized {
 
     fn history_filter(self) -> &'static str;
 
+    fn owner_param(self) -> &'static str;
+
     fn parts(self) -> Option<(&'static str, &'static str)>;
 
     fn reference_field(self) -> &'static str;
@@ -23,7 +25,7 @@ pub(crate) trait Shape: Sized {
 
     fn title_search(self, id: i64) -> serde_json::Value;
 
-    fn queue_detail(self) -> &'static str;
+    fn episode_detail(self) -> &'static str;
 }
 
 impl Shape for Kind {
@@ -52,6 +54,13 @@ impl Shape for Kind {
         match self {
             Kind::Tv => "seriesIds",
             Kind::Movies => "movieIds",
+        }
+    }
+
+    fn owner_param(self) -> &'static str {
+        match self {
+            Kind::Tv => "seriesId",
+            Kind::Movies => "movieId",
         }
     }
 
@@ -107,7 +116,7 @@ impl Shape for Kind {
         }
     }
 
-    fn queue_detail(self) -> &'static str {
+    fn episode_detail(self) -> &'static str {
         match self {
             Kind::Tv => "&includeEpisode=true",
             Kind::Movies => "",
