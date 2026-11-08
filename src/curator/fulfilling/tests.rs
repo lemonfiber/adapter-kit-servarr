@@ -279,7 +279,7 @@ async fn what_it_downloads_is_read_from_its_queue_with_each_episode() {
     let fake = Fake::always(Answer::reply(
         200,
         r#"{"totalRecords":2,"records":[
-            {"title":"Sintel.S01E02","seriesId":4,"size":1000,"sizeleft":250.4,"status":"downloading",
+            {"id":1786,"title":"Sintel.S01E02","seriesId":4,"size":1000,"sizeleft":250.4,"status":"downloading",
              "trackedDownloadStatus":"ok","trackedDownloadState":"downloading",
              "estimatedCompletionTime":"2024-05-01T10:20:30Z","downloadId":"SAB_1",
              "episode":{"seasonNumber":1,"episodeNumber":2,"title":"Two"}},
@@ -300,6 +300,7 @@ async fn what_it_downloads_is_read_from_its_queue_with_each_episode() {
             "expected": 1_714_558_830,
             "state": "downloading",
             "download_id": "SAB_1",
+            "queued": 1786,
             "episode": { "season": 1, "number": 2, "title": "Two" },
         })])
     );
@@ -321,10 +322,11 @@ async fn what_it_downloads_is_read_from_its_queue_with_each_episode() {
                 one.release,
                 one.bytes,
                 one.expected,
-                one.download_id
+                one.download_id,
+                one.queued
             ))
             .collect::<Vec<_>>()),
-        Some(vec![(7, String::new(), 0, None, None)])
+        Some(vec![(7, String::new(), 0, None, None, None)])
     );
     assert_eq!(asked(&fake), [api("/queue?page=1&pageSize=200")]);
 }
