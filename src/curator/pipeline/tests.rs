@@ -1,4 +1,5 @@
 use lemonfiber_fixtures::http::{Answer, Fake};
+use lemonfiber_ports::digest::sha256;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::stage::{Outcome, Stage, HISTORY_HORIZON};
 use lemonfiber_ports::service::{FoundItem, ItemPart, Pipeline, QueueItem, StuckItem, TraceEvent};
@@ -196,6 +197,9 @@ async fn each_stuck_item_is_named_once_by_its_title() {
         Some(vec![StuckItem {
             title: "Show".to_owned(),
             stage: Stage::of_queue_state("importPending").unwrap_or(Stage::Downloading),
+            queued: None,
+            title_id: None,
+            release: None,
         }])
     );
     assert_eq!(
@@ -204,6 +208,70 @@ async fn each_stuck_item_is_named_once_by_its_title() {
             "/queue?page=1&pageSize=200&includeSeries=true&includeMovie=true"
         )]
     );
+}
+
+#[tokio::test]
+async fn a_stuck_item_names_its_queue_entry_its_title_and_the_fingerprint_of_the_guid_it_was_grabbed_by(
+) {
+    let fake = Fake::by_path(vec![
+        (
+            "/queue?",
+            Answer::reply(
+                200,
+                r#"{"totalRecords":2,"records":[
+                    {"id":51,"seriesId":4,"downloadId":"SABnzbd_nzo_1","trackedDownloadStatus":"warning","series":{"title":"Show"}},
+                    {"id":52,"seriesId":5,"downloadId":"","trackedDownloadStatus":"error","series":{"title":"Other"}}
+                ]}"#,
+            ),
+        ),
+        (
+            "/history?",
+            Answer::reply(
+                200,
+                r#"{"records":[{"sourceTitle":"Show.S01E01","data":{"guid":"https://indexer/details/9?apikey=secret"}}]}"#,
+            ),
+        ),
+    ]);
+    assert_eq!(
+        television(&fake)
+            .stuck_items(Kind::Tv)
+            .await
+            .ok()
+            .map(|all| all
+                .into_iter()
+                .map(|one| (one.queued, one.title_id, one.release))
+                .collect::<Vec<_>>()),
+        Some(vec![
+            (
+                Some(51),
+                Some(4),
+                Some(sha256("https://indexer/details/9?apikey=secret"))
+            ),
+            (Some(52), Some(5), None)
+        ])
+    );
+    assert_eq!(
+        asked(&fake),
+        [
+            api("/queue?page=1&pageSize=200&includeSeries=true&includeMovie=true"),
+            api("/history?page=1&pageSize=1&eventType=1&downloadId=SABnzbd_nzo_1")
+        ]
+    );
+}
+
+#[tokio::test]
+async fn a_stuck_item_whose_grab_history_cannot_be_read_is_a_failure() {
+    let fake = Fake::by_path(vec![
+        (
+            "/queue?",
+            Answer::reply(
+                200,
+                r#"{"totalRecords":1,"records":[{"id":51,"downloadId":"x","trackedDownloadStatus":"warning","series":{"title":"Show"}}]}"#,
+            ),
+        ),
+        ("/history?", Answer::reply(500, "")),
+    ]);
+    assert!(television(&fake).stuck_items(Kind::Tv).await.is_err());
 }
 
 #[tokio::test]

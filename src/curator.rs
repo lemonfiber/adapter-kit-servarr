@@ -11,6 +11,7 @@ mod carrying;
 mod catalogue;
 mod clients;
 mod fulfilling;
+mod grabs;
 mod importing;
 mod kind;
 mod pipeline;
@@ -34,11 +35,15 @@ const THE_LIBRARY: &str = "the library";
 
 const THE_QUALITY_PROFILES: &str = "the quality profiles";
 
+const THE_RELEASE_SEARCH: &str = "the release search";
+
 const THE_ROOT_FOLDERS: &str = "the root folders";
 
 const THE_WANTED_LIST: &str = "the wanted list";
 
 const QUALITY_PROFILES: &str = "/qualityprofile";
+
+const RELEASE: &str = "/release";
 
 const ROOT_FOLDERS: &str = "/rootfolder";
 

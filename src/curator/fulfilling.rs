@@ -3,7 +3,7 @@ use lemonfiber_adapter_kit::endpoint::form_encoded;
 use lemonfiber_ports::http::Method;
 use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{
-    AddPlan, CuratedTitle, Downloading, Failure, Fulfilling, TitleRequest,
+    AddPlan, CuratedTitle, Downloading, Failure, Fulfilling, Grabbed, TitleRequest,
 };
 use serde::Deserialize as _;
 use serde_json::{json, Map, Value};
@@ -16,6 +16,7 @@ use super::{
     THE_EPISODES, THE_LIBRARY, THE_QUALITY_PROFILES, THE_ROOT_FOLDERS,
 };
 
+mod again;
 mod downloads;
 mod titled;
 
@@ -106,11 +107,22 @@ impl<M: Music> Fulfilling for Curator<M> {
     async fn downloading(&self, kind: Kind) -> Result<Vec<Downloading>, Failure> {
         let kind = self.filing(kind)?;
         Ok(self
-            .queue_pages(kind.queue_detail())
+            .queue_pages(kind.episode_detail())
             .await?
             .into_iter()
             .filter_map(|record| downloads::downloading(kind, record))
             .collect())
+    }
+
+    async fn unqueue(&self, kind: Kind, id: i64, blocklist: bool) -> Result<String, Failure> {
+        self.filing(kind)?;
+        self.unqueued(id, blocklist).await
+    }
+
+    async fn grab(&self, kind: Kind, id: i64, release: &str) -> Result<Grabbed, Failure> {
+        let kind = self.filing(kind)?;
+        self.holding_title(kind, id).await?;
+        self.grabbed_again(kind, id, release).await
     }
 }
 

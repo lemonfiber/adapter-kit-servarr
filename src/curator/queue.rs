@@ -16,7 +16,7 @@ const STUCK: [&str; 2] = ["warning", "error"];
 
 const THE_QUEUE: &str = "the queue";
 
-const QUEUE: &str = "/queue";
+pub(crate) const QUEUE: &str = "/queue";
 
 #[derive(Deserialize)]
 struct HistoryPage {

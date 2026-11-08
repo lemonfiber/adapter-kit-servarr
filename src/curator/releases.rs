@@ -4,7 +4,7 @@ use lemonfiber_ports::service::{Failure, QualityReleases, ReleaseProbe};
 use serde::Deserialize;
 
 use super::kind::Shape as _;
-use super::{Curator, Music, THE_WANTED_LIST};
+use super::{Curator, Music, RELEASE, THE_RELEASE_SEARCH, THE_WANTED_LIST};
 
 const FIRST_WANTED: &str = "/wanted/missing?page=1&pageSize=1";
 
@@ -36,8 +36,8 @@ impl<M: Music> QualityReleases for Curator<M> {
         let releases: Vec<ReleaseResource> = self
             .servarr
             .read(
-                &format!("/release?{}={}", kind.release_id_param(), first.id),
-                "the release search",
+                &format!("{RELEASE}?{}={}", kind.release_id_param(), first.id),
+                THE_RELEASE_SEARCH,
             )
             .await?;
         Ok(if releases.is_empty() {
