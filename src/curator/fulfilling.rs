@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use lemonfiber_adapter_kit::endpoint::form_encoded;
 use lemonfiber_ports::http::Method;
-use lemonfiber_ports::media::Kind;
+use lemonfiber_ports::media::{Kind, TitleKind};
 use lemonfiber_ports::service::{
     AddPlan, CuratedTitle, Downloading, Failure, Fulfilling, Grabbed, TitleRequest,
 };
@@ -9,10 +9,11 @@ use serde::Deserialize as _;
 use serde_json::{json, Map, Value};
 
 use super::catalogue::addition;
+use super::filed::Filed;
 use super::kind::Shape as _;
 use super::wire::{FolderResource, ProfileResource};
 use super::{
-    Curator, Music, COMMAND, MONITORED, QUALITY_PROFILES, ROOT_FOLDERS, THE_CATALOGUE,
+    Curator, Music, ARTIST_ID, COMMAND, MONITORED, QUALITY_PROFILES, ROOT_FOLDERS, THE_CATALOGUE,
     THE_EPISODES, THE_LIBRARY, THE_QUALITY_PROFILES, THE_ROOT_FOLDERS,
 };
 
@@ -58,19 +59,22 @@ impl<M: Music> Fulfilling for Curator<M> {
             ),
             None => self.looked_up(kind, reference).await?,
         };
-        Ok(found.map(|title| title.curated(kind)))
+        Ok(found.map(|title| title.curated(kind.into())))
     }
 
-    async fn titles(&self, kind: Kind) -> Result<Vec<CuratedTitle>, Failure> {
-        let kind = self.filing(kind)?;
+    async fn titles(&self, kind: TitleKind) -> Result<Vec<CuratedTitle>, Failure> {
+        let kind = self.filed(kind)?;
         let held: Vec<TitleResource> = self.servarr.read(&library(kind), THE_LIBRARY).await?;
         Ok(held.into_iter().map(|title| title.curated(kind)).collect())
     }
 
     async fn held_title(&self, kind: Kind, id: i64) -> Result<Option<CuratedTitle>, Failure> {
         let kind = self.filing(kind)?;
-        let held: Option<TitleResource> = self.servarr.find(&titled(kind, id), THE_TITLE).await?;
-        Ok(held.map(|title| title.curated(kind)))
+        let held: Option<TitleResource> = self
+            .servarr
+            .find(&titled(kind.into(), id), THE_TITLE)
+            .await?;
+        Ok(held.map(|title| title.curated(kind.into())))
     }
 
     async fn request(&self, kind: Kind, request: &TitleRequest) -> Result<CuratedTitle, Failure> {
@@ -79,24 +83,24 @@ impl<M: Music> Fulfilling for Curator<M> {
             Some(held) => self.monitored(kind, held, request).await?,
             None => self.added(kind, request).await?,
         };
-        Ok(title.curated(kind))
+        Ok(title.curated(kind.into()))
     }
 
-    async fn search(&self, kind: Kind, id: i64) -> Result<(), Failure> {
-        let kind = self.filing(kind)?;
+    async fn search(&self, kind: TitleKind, id: i64) -> Result<(), Failure> {
+        let kind = self.filed(kind)?;
         self.holding_title(kind, id).await?;
         self.searched(kind, id).await
     }
 
     async fn remove(&self, kind: Kind, id: i64) -> Result<(), Failure> {
         let kind = self.filing(kind)?;
-        self.holding_title(kind, id).await?;
+        self.holding_title(kind.into(), id).await?;
         self.servarr
             .done(
                 Method::Delete,
                 &format!(
                     "{}?deleteFiles=true&{}=false",
-                    titled(kind, id),
+                    titled(kind.into(), id),
                     kind.exclusion_param()
                 ),
                 None,
@@ -104,8 +108,8 @@ impl<M: Music> Fulfilling for Curator<M> {
             .await
     }
 
-    async fn downloading(&self, kind: Kind) -> Result<Vec<Downloading>, Failure> {
-        let kind = self.filing(kind)?;
+    async fn downloading(&self, kind: TitleKind) -> Result<Vec<Downloading>, Failure> {
+        let kind = self.filed(kind)?;
         Ok(self
             .queue_pages(kind.episode_detail())
             .await?
@@ -114,15 +118,19 @@ impl<M: Music> Fulfilling for Curator<M> {
             .collect())
     }
 
-    async fn unqueue(&self, kind: Kind, id: i64, blocklist: bool) -> Result<String, Failure> {
-        self.filing(kind)?;
+    async fn unqueue(&self, kind: TitleKind, id: i64, blocklist: bool) -> Result<String, Failure> {
+        self.filed(kind)?;
         self.unqueued(id, blocklist).await
     }
 
-    async fn grab(&self, kind: Kind, id: i64, release: &str) -> Result<Grabbed, Failure> {
-        let kind = self.filing(kind)?;
-        self.holding_title(kind, id).await?;
-        self.grabbed_again(kind, id, release).await
+    async fn grab(&self, kind: TitleKind, id: i64, release: &str) -> Result<Grabbed, Failure> {
+        let kind = self.filed(kind)?;
+        let held = self.holding_title(kind, id).await?;
+        let artist = held
+            .get(ARTIST_ID)
+            .and_then(Value::as_i64)
+            .unwrap_or_default();
+        self.grabbed_again(kind, id, artist, release).await
     }
 }
 
@@ -136,7 +144,7 @@ impl<M: Music> Curator<M> {
         let held: Vec<Map<String, Value>> = self
             .servarr
             .read(
-                &format!("{}?{field}={reference}", library(kind)),
+                &format!("{}?{field}={reference}", library(kind.into())),
                 THE_LIBRARY,
             )
             .await?;
@@ -156,7 +164,7 @@ impl<M: Music> Curator<M> {
             .read(
                 &format!(
                     "{}/lookup?{}",
-                    library(kind),
+                    library(kind.into()),
                     form_encoded(&[("term", &term)])
                 ),
                 THE_CATALOGUE,
@@ -164,25 +172,24 @@ impl<M: Music> Curator<M> {
             .await?;
         Ok(found
             .into_iter()
-            .find(|title| title.reference(kind) == Some(reference)))
+            .find(|title| title.reference(kind.into()) == Some(reference)))
     }
 
-    async fn holding_title(&self, kind: Kind, id: i64) -> Result<(), Failure> {
-        let held: Option<serde::de::IgnoredAny> =
-            self.servarr.find(&titled(kind, id), THE_TITLE).await?;
-        held.map(drop).ok_or_else(|| {
+    async fn holding_title(&self, filed: Filed, id: i64) -> Result<Value, Failure> {
+        let held: Option<Value> = self.servarr.find(&titled(filed, id), THE_TITLE).await?;
+        held.ok_or_else(|| {
             self.servarr
                 .endpoint()
-                .refused(&format!("it holds no {} as {id}", kind.noun()))
+                .refused(&format!("it holds no {} as {id}", filed.noun()))
         })
     }
 
-    async fn searched(&self, kind: Kind, id: i64) -> Result<(), Failure> {
+    async fn searched(&self, filed: Filed, id: i64) -> Result<(), Failure> {
         self.servarr
             .done(
                 Method::Post,
                 COMMAND,
-                Some(kind.title_search(id).to_string()),
+                Some(filed.title_search(id).to_string()),
             )
             .await
     }
@@ -255,7 +262,7 @@ impl<M: Music> Curator<M> {
             .servarr
             .ask(
                 Method::Put,
-                &titled(kind, id),
+                &titled(kind.into(), id),
                 Some(Value::Object(held).to_string()),
             )
             .await?;
@@ -267,7 +274,7 @@ impl<M: Music> Curator<M> {
             self.parts_monitored(parts, id, &request.seasons).await?;
         }
         if request.search {
-            self.searched(kind, id).await?;
+            self.searched(kind.into(), id).await?;
         }
         Ok(title)
     }
@@ -300,12 +307,12 @@ impl<M: Music> Curator<M> {
     }
 }
 
-fn library(kind: Kind) -> String {
-    format!("/{}", kind.library_endpoint())
+fn library(filed: Filed) -> String {
+    format!("/{}", filed.library_endpoint())
 }
 
-fn titled(kind: Kind, id: i64) -> String {
-    format!("/{}/{id}", kind.library_endpoint())
+fn titled(filed: Filed, id: i64) -> String {
+    format!("/{}/{id}", filed.library_endpoint())
 }
 
 fn asked_for(season: &Map<String, Value>, seasons: &[u32]) -> bool {

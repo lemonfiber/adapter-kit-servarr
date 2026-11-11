@@ -1,6 +1,6 @@
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::http::Method;
-use lemonfiber_ports::media::Kind;
+use lemonfiber_ports::media::{Kind, TitleKind};
 use lemonfiber_ports::service::{CuratedSeason, CuratedTitle, Failure, Fulfilling, TitleRequest};
 
 use crate::testing::{api, asked, films, music, sent_body, television};
@@ -142,14 +142,14 @@ async fn a_title_it_does_not_hold_is_catalogued_as_its_catalogue_knows_it_unmoni
 async fn every_title_it_holds_is_answered() {
     let fake = Fake::always(Answer::reply(200, format!("[{SERIES},{SERIES}]")));
     assert_eq!(
-        television(&fake).titles(Kind::Tv).await.ok(),
+        television(&fake).titles(TitleKind::Tv).await.ok(),
         Some(vec![series(), series()])
     );
     assert_eq!(asked(&fake), [api("/series")]);
 
     let fake = Fake::always(Answer::reply(200, format!("[{FILM}]")));
     assert_eq!(
-        films(&fake).titles(Kind::Movies).await.ok(),
+        films(&fake).titles(TitleKind::Movies).await.ok(),
         Some(vec![film()])
     );
     assert_eq!(asked(&fake), [api("/movie")]);
@@ -180,7 +180,7 @@ async fn a_title_it_holds_is_searched_for_as_the_command_for_its_kind() {
         (Method::Get, "/series/4", Answer::reply(200, SERIES)),
         (Method::Post, "/command", Answer::reply(201, "{}")),
     ]);
-    assert!(television(&fake).search(Kind::Tv, 4).await.is_ok());
+    assert!(television(&fake).search(TitleKind::Tv, 4).await.is_ok());
     assert_eq!(asked(&fake), [api("/series/4"), api("/command")]);
     assert_eq!(
         sent_body(fake.request()),
@@ -191,7 +191,7 @@ async fn a_title_it_holds_is_searched_for_as_the_command_for_its_kind() {
         (Method::Get, "/movie/7", Answer::reply(200, FILM)),
         (Method::Post, "/command", Answer::reply(201, "{}")),
     ]);
-    assert!(films(&fake).search(Kind::Movies, 7).await.is_ok());
+    assert!(films(&fake).search(TitleKind::Movies, 7).await.is_ok());
     assert_eq!(
         sent_body(fake.request()),
         serde_json::json!({ "name": "MoviesSearch", "movieIds": [7] })
@@ -232,7 +232,7 @@ async fn a_title_it_does_not_hold_is_neither_searched_for_nor_removed() {
     ]);
     let tv = television(&fake);
     assert!(refused(
-        tv.search(Kind::Tv, 5).await,
+        tv.search(TitleKind::Tv, 5).await,
         "it holds no series as 5"
     ));
     assert!(refused(
@@ -264,12 +264,12 @@ async fn a_kind_it_does_not_file_is_unsupported_before_anything_is_asked() {
                 if detail == format!("it files no {}", kind.noun()))
         };
         assert!(said(curator.catalogued(kind, 11).await.map(drop)));
-        assert!(said(curator.titles(kind).await.map(drop)));
+        assert!(said(curator.titles(kind.into()).await.map(drop)));
         assert!(said(curator.held_title(kind, 4).await.map(drop)));
         assert!(said(curator.request(kind, &request).await.map(drop)));
-        assert!(said(curator.search(kind, 4).await));
+        assert!(said(curator.search(kind.into(), 4).await));
         assert!(said(curator.remove(kind, 4).await));
-        assert!(said(curator.downloading(kind).await.map(drop)));
+        assert!(said(curator.downloading(kind.into()).await.map(drop)));
     }
     assert!(asked(&fake).is_empty());
 }
@@ -286,7 +286,7 @@ async fn what_it_downloads_is_read_from_its_queue_with_each_episode() {
             {"title":"Unmatched","status":"downloading"}
         ]}"#,
     ));
-    let downloading = television(&fake).downloading(Kind::Tv).await;
+    let downloading = television(&fake).downloading(TitleKind::Tv).await;
     assert_eq!(
         downloading.ok().map(|all| all
             .into_iter()
@@ -313,7 +313,7 @@ async fn what_it_downloads_is_read_from_its_queue_with_each_episode() {
         200,
         r#"{"totalRecords":1,"records":[{"movieId":7,"downloadId":"","estimatedCompletionTime":"soon"}]}"#,
     ));
-    let downloading = films(&fake).downloading(Kind::Movies).await;
+    let downloading = films(&fake).downloading(TitleKind::Movies).await;
     assert_eq!(
         downloading.ok().map(|all| all
             .into_iter()
@@ -335,7 +335,7 @@ async fn what_it_downloads_is_read_from_its_queue_with_each_episode() {
 async fn a_queue_it_cannot_read_is_refused() {
     let fake = Fake::always(Answer::reply(200, r#"{"records":"none"}"#));
     assert!(matches!(
-        films(&fake).downloading(Kind::Movies).await,
+        films(&fake).downloading(TitleKind::Movies).await,
         Err(Failure::Refused { .. })
     ));
 }

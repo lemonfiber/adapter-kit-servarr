@@ -2,6 +2,8 @@ use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{Category, ClientProbe, RegisteredClient};
 use serde::Deserialize;
 
+use super::filed::Filed;
+
 const CATEGORY_SUFFIX: &str = "Category";
 
 const HOST: &str = "host";
@@ -17,12 +19,12 @@ pub(crate) struct StatusMessage {
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct QueueResource {
+#[serde(rename_all = "camelCase", bound = "T: Deserialize<'de>")]
+pub(crate) struct Page<T> {
     #[serde(default)]
     pub(crate) total_records: usize,
     #[serde(default)]
-    pub(crate) records: Vec<QueueRecord>,
+    pub(crate) records: Vec<T>,
 }
 
 #[derive(Deserialize)]
@@ -47,11 +49,15 @@ pub(crate) struct QueueRecord {
     #[serde(default)]
     pub(crate) movie_id: Option<i64>,
     #[serde(default)]
+    pub(crate) album_id: Option<i64>,
+    #[serde(default)]
     pub(crate) episode_id: Option<i64>,
     #[serde(default)]
     pub(crate) series: Option<TitledResource>,
     #[serde(default)]
     pub(crate) movie: Option<TitledResource>,
+    #[serde(default)]
+    pub(crate) album: Option<TitledResource>,
     #[serde(default)]
     pub(crate) status: String,
     #[serde(default)]
@@ -83,27 +89,30 @@ pub(crate) struct TitledResource {
 
 impl QueueRecord {
     pub(crate) const fn item(&self) -> Option<i64> {
-        match self.episode_id {
-            Some(episode) => Some(episode),
-            None => self.movie_id,
+        match (self.episode_id, self.movie_id) {
+            (Some(episode), _) => Some(episode),
+            (None, Some(movie)) => Some(movie),
+            (None, None) => self.album_id,
         }
     }
 
-    pub(crate) fn is_for(&self, kind: Kind, id: i64) -> bool {
-        self.owner(kind) == Some(id)
+    pub(crate) fn is_for(&self, filed: Filed, id: i64) -> bool {
+        self.owner(filed) == Some(id)
     }
 
-    pub(crate) const fn owner(&self, kind: Kind) -> Option<i64> {
-        match kind {
-            Kind::Tv => self.series_id,
-            Kind::Movies => self.movie_id,
+    pub(crate) const fn owner(&self, filed: Filed) -> Option<i64> {
+        match filed {
+            Filed::Video(Kind::Tv) => self.series_id,
+            Filed::Video(Kind::Movies) => self.movie_id,
+            Filed::Album => self.album_id,
         }
     }
 
-    pub(crate) fn item_title(&self, kind: Kind) -> Option<String> {
-        match kind {
-            Kind::Tv => self.series.as_ref(),
-            Kind::Movies => self.movie.as_ref(),
+    pub(crate) fn item_title(&self, filed: Filed) -> Option<String> {
+        match filed {
+            Filed::Video(Kind::Tv) => self.series.as_ref(),
+            Filed::Video(Kind::Movies) => self.movie.as_ref(),
+            Filed::Album => self.album.as_ref(),
         }
         .map(|resource| resource.title.clone())
         .filter(|title| !title.is_empty())

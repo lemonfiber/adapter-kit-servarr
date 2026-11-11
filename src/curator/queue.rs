@@ -3,9 +3,10 @@ use std::collections::BTreeMap;
 use async_trait::async_trait;
 use lemonfiber_ports::service::stage::Outcome;
 use lemonfiber_ports::service::{Failure, Queue, Queued, Queues};
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
 
-use super::wire::{QueueRecord, QueueResource};
+use super::wire::{Page, QueueRecord};
 use super::{newest_history, Curator, Music, THE_HISTORY};
 
 const QUEUE_PAGE: usize = 200;
@@ -33,13 +34,16 @@ struct HistoryRecord {
     episode_id: Option<i64>,
     #[serde(default)]
     movie_id: Option<i64>,
+    #[serde(default)]
+    album_id: Option<i64>,
 }
 
 impl HistoryRecord {
     const fn item(&self) -> Option<i64> {
-        match self.episode_id {
-            Some(episode) => Some(episode),
-            None => self.movie_id,
+        match (self.episode_id, self.movie_id) {
+            (Some(episode), _) => Some(episode),
+            (None, Some(movie)) => Some(movie),
+            (None, None) => self.album_id,
         }
     }
 }
@@ -51,7 +55,7 @@ pub(crate) fn is_stuck(status: &str) -> bool {
 #[async_trait]
 impl<M: Music> Queues for Curator<M> {
     async fn queue(&self) -> Result<Queue, Failure> {
-        let queue: QueueResource = self
+        let queue: Page<QueueRecord> = self
             .servarr
             .read(&format!("{QUEUE}?pageSize={QUEUE_PAGE}"), THE_QUEUE)
             .await?;
@@ -69,19 +73,29 @@ impl<M: Music> Queues for Curator<M> {
 
 impl<M: Music> Curator<M> {
     pub(crate) async fn queue_pages(&self, query: &str) -> Result<Vec<QueueRecord>, Failure> {
+        self.paged(QUEUE, QUEUE_PAGE, query, THE_QUEUE).await
+    }
+
+    pub(crate) async fn paged<T: DeserializeOwned>(
+        &self,
+        endpoint: &str,
+        size: usize,
+        query: &str,
+        what: &str,
+    ) -> Result<Vec<T>, Failure> {
         let mut records = Vec::new();
         let mut page = 1;
         loop {
-            let queue: QueueResource = self
+            let read: Page<T> = self
                 .servarr
                 .read(
-                    &format!("{QUEUE}?page={page}&pageSize={QUEUE_PAGE}{query}"),
-                    THE_QUEUE,
+                    &format!("{endpoint}?page={page}&pageSize={size}{query}"),
+                    what,
                 )
                 .await?;
-            let on_this_page = queue.records.len();
-            records.extend(queue.records);
-            if on_this_page < QUEUE_PAGE || page * QUEUE_PAGE >= queue.total_records {
+            let on_this_page = read.records.len();
+            records.extend(read.records);
+            if on_this_page < size || page * size >= read.total_records {
                 return Ok(records);
             }
             page += 1;

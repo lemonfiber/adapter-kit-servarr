@@ -1,9 +1,8 @@
 use async_trait::async_trait;
-use lemonfiber_ports::media::Kind;
+use lemonfiber_ports::media::TitleKind;
 use lemonfiber_ports::service::{Failure, QualityReleases, ReleaseProbe};
 use serde::Deserialize;
 
-use super::kind::Shape as _;
 use super::{Curator, Music, RELEASE, THE_RELEASE_SEARCH, THE_WANTED_LIST};
 
 const FIRST_WANTED: &str = "/wanted/missing?page=1&pageSize=1";
@@ -27,8 +26,8 @@ struct ReleaseResource {
 
 #[async_trait]
 impl<M: Music> QualityReleases for Curator<M> {
-    async fn probe_releases(&self, kind: Kind) -> Result<ReleaseProbe, Failure> {
-        let kind = self.filing(kind)?;
+    async fn probe_releases(&self, kind: TitleKind) -> Result<ReleaseProbe, Failure> {
+        let kind = self.filed(kind)?;
         let wanted: Wanted = self.servarr.read(FIRST_WANTED, THE_WANTED_LIST).await?;
         let Some(first) = wanted.records.first() else {
             return Ok(ReleaseProbe::NothingWanted);
