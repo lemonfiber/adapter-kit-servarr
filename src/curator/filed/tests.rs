@@ -75,16 +75,24 @@ async fn an_album_s_history_is_read_by_its_own_id_and_names_no_part() {
     let fake = Fake::always(Answer::reply(
         200,
         r#"{"records":[
+            {"eventType":"trackFileDeleted","date":"2026-10-03T10:00:00Z","albumId":7,"trackId":70},
+            {"eventType":"downloadImported","date":"2026-10-02T10:00:00Z","albumId":7,"trackId":0},
+            {"eventType":"trackFileImported","date":"2026-10-02T09:59:00Z","albumId":7,"trackId":70},
             {"eventType":"grabbed","date":"2026-10-01T10:00:00Z","albumId":7,"trackId":0}
         ]}"#,
     ));
+    let event = |outcome, at: &str| TraceEvent {
+        outcome,
+        at: at.to_owned(),
+        part: None,
+    };
     assert_eq!(
         music(&fake).item_history(TitleKind::Music, 7).await.ok(),
-        Some(vec![TraceEvent {
-            outcome: Outcome::Grabbed,
-            at: "2026-10-01T10:00:00Z".to_owned(),
-            part: None,
-        }])
+        Some(vec![
+            event(Outcome::Removed, "2026-10-03T10:00:00Z"),
+            event(Outcome::Imported, "2026-10-02T10:00:00Z"),
+            event(Outcome::Grabbed, "2026-10-01T10:00:00Z"),
+        ])
     );
     assert_eq!(
         asked(&fake),
