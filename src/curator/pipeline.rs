@@ -1,8 +1,9 @@
 use std::collections::BTreeSet;
 
 use async_trait::async_trait;
+use lemonfiber_manifest::ApiKind;
 use lemonfiber_ports::media::TitleKind;
-use lemonfiber_ports::service::stage::{History, Outcome, Stage, HISTORY_HORIZON};
+use lemonfiber_ports::service::stage::{Outcome, Stage, HISTORY_HORIZON};
 use lemonfiber_ports::service::{
     Failure, FoundItem, ItemPart, Pipeline, QueueItem, StuckItem, TraceEvent,
 };
@@ -110,7 +111,7 @@ impl<M: Music> Pipeline for Curator<M> {
             .records
             .into_iter()
             .filter_map(|record| {
-                Outcome::of_event(History::Servarr, &record.event_type).map(|outcome| TraceEvent {
+                Outcome::of_event(ApiKind::Servarr, &record.event_type).map(|outcome| TraceEvent {
                     outcome,
                     at: record.date,
                     part: record.episode_id,

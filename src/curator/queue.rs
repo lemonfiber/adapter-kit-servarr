@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
 use async_trait::async_trait;
-use lemonfiber_ports::service::stage::{History, Outcome};
+use lemonfiber_manifest::ApiKind;
+use lemonfiber_ports::service::stage::Outcome;
 use lemonfiber_ports::service::{Failure, Queue, Queued, Queues};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -121,7 +122,7 @@ fn counted(records: &[HistoryRecord]) -> BTreeMap<i64, u32> {
         if settled.get(&item).copied().unwrap_or(false) {
             continue;
         }
-        match Outcome::of_event(History::Servarr, &record.event_type) {
+        match Outcome::of_event(ApiKind::Servarr, &record.event_type) {
             Some(Outcome::Grabbed) => *grabs.entry(item).or_insert(0) += 1,
             Some(Outcome::Imported) => {
                 settled.insert(item, true);
