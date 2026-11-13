@@ -1,5 +1,5 @@
 use lemonfiber_fixtures::http::Fake;
-use lemonfiber_ports::media::Kind;
+use lemonfiber_ports::media::TitleKind;
 use lemonfiber_ports::service::Pipeline;
 
 use crate::testing::television;
@@ -15,7 +15,7 @@ async fn a_queue_entry_with_no_download_id_asks_no_history() {
     ));
     assert_eq!(
         television(&fake)
-            .stuck_items(Kind::Tv)
+            .stuck_items(TitleKind::Tv)
             .await
             .ok()
             .map(|all| all.into_iter().map(|one| one.release).collect::<Vec<_>>()),

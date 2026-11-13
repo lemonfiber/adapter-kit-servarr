@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::http::Method;
-use lemonfiber_ports::media::{Format, Kind};
+use lemonfiber_ports::media::{Format, Kind, TitleKind};
 use lemonfiber_ports::service::{
     Carrying, Catalogue, Failure, Maintenance, MusicQuality, Pipeline, QualityReleases, Record,
     RootFolder,
@@ -73,11 +73,11 @@ async fn a_kind_it_does_not_file_is_refused_before_anything_is_asked() {
         "it files no series"
     ));
     assert!(unsupported(
-        music(&fake).library(Kind::Tv).await,
+        music(&fake).library(TitleKind::Tv).await,
         "it files no series"
     ));
     assert!(unsupported(
-        music(&fake).probe_releases(Kind::Movies).await,
+        music(&fake).probe_releases(TitleKind::Movies).await,
         "it files no film"
     ));
     assert!(asked(&fake).is_empty());

@@ -1,18 +1,16 @@
 use std::collections::BTreeSet;
 
 use async_trait::async_trait;
-use lemonfiber_ports::media::Kind;
+use lemonfiber_manifest::ApiKind;
+use lemonfiber_ports::media::TitleKind;
 use lemonfiber_ports::service::stage::{Outcome, Stage, HISTORY_HORIZON};
 use lemonfiber_ports::service::{
     Failure, FoundItem, ItemPart, Pipeline, QueueItem, StuckItem, TraceEvent,
 };
 use serde::Deserialize;
 
-use super::kind::Shape as _;
 use super::queue::is_stuck;
 use super::{newest_history, Curator, Music, THE_EPISODES, THE_HISTORY, THE_LIBRARY};
-
-const WITH_ITEMS: &str = "&includeSeries=true&includeMovie=true";
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +20,8 @@ struct LibraryItem {
     title: String,
     #[serde(default)]
     year: Option<u16>,
+    #[serde(default)]
+    release_date: Option<String>,
     #[serde(default)]
     monitored: bool,
 }
@@ -65,8 +65,8 @@ fn staged(state: &str) -> Stage {
 
 #[async_trait]
 impl<M: Music> Pipeline for Curator<M> {
-    async fn library(&self, kind: Kind) -> Result<Vec<FoundItem>, Failure> {
-        let kind = self.filing(kind)?;
+    async fn library(&self, kind: TitleKind) -> Result<Vec<FoundItem>, Failure> {
+        let kind = self.filed(kind)?;
         let items: Vec<LibraryItem> = self
             .servarr
             .read(&format!("/{}", kind.library_endpoint()), THE_LIBRARY)
@@ -76,13 +76,15 @@ impl<M: Music> Pipeline for Curator<M> {
             .map(|item| FoundItem {
                 id: item.id,
                 title: item.title,
-                year: item.year.filter(|year| *year > 0),
+                year: kind
+                    .year(item.year, item.release_date.as_deref())
+                    .filter(|year| *year > 0),
                 monitored: item.monitored,
             })
             .collect())
     }
 
-    async fn find_items(&self, kind: Kind, term: &str) -> Result<Vec<FoundItem>, Failure> {
+    async fn find_items(&self, kind: TitleKind, term: &str) -> Result<Vec<FoundItem>, Failure> {
         let needle = term.to_lowercase();
         Ok(self
             .library(kind)
@@ -92,8 +94,8 @@ impl<M: Music> Pipeline for Curator<M> {
             .collect())
     }
 
-    async fn item_history(&self, kind: Kind, id: i64) -> Result<Vec<TraceEvent>, Failure> {
-        let kind = self.filing(kind)?;
+    async fn item_history(&self, kind: TitleKind, id: i64) -> Result<Vec<TraceEvent>, Failure> {
+        let kind = self.filed(kind)?;
         let page: HistoryPage = self
             .servarr
             .read(
@@ -109,7 +111,7 @@ impl<M: Music> Pipeline for Curator<M> {
             .records
             .into_iter()
             .filter_map(|record| {
-                Outcome::of_event(&record.event_type).map(|outcome| TraceEvent {
+                Outcome::of_event(ApiKind::Servarr, &record.event_type).map(|outcome| TraceEvent {
                     outcome,
                     at: record.date,
                     part: record.episode_id,
@@ -118,8 +120,8 @@ impl<M: Music> Pipeline for Curator<M> {
             .collect())
     }
 
-    async fn item_queue(&self, kind: Kind, id: i64) -> Result<Vec<QueueItem>, Failure> {
-        let kind = self.filing(kind)?;
+    async fn item_queue(&self, kind: TitleKind, id: i64) -> Result<Vec<QueueItem>, Failure> {
+        let kind = self.filed(kind)?;
         Ok(self
             .queue_pages("")
             .await?
@@ -135,11 +137,11 @@ impl<M: Music> Pipeline for Curator<M> {
 
     async fn item_parts(
         &self,
-        kind: Kind,
+        kind: TitleKind,
         id: i64,
         season: Option<u32>,
     ) -> Result<Vec<ItemPart>, Failure> {
-        let kind = self.filing(kind)?;
+        let kind = self.filed(kind)?;
         let Some((endpoint, filter)) = kind.parts() else {
             return Ok(Vec::new());
         };
@@ -161,9 +163,9 @@ impl<M: Music> Pipeline for Curator<M> {
             .collect())
     }
 
-    async fn stuck_items(&self, kind: Kind) -> Result<Vec<StuckItem>, Failure> {
-        let kind = self.filing(kind)?;
-        let records = self.queue_pages(WITH_ITEMS).await?;
+    async fn stuck_items(&self, kind: TitleKind) -> Result<Vec<StuckItem>, Failure> {
+        let kind = self.filed(kind)?;
+        let records = self.queue_pages(kind.with_items()).await?;
         let mut seen = BTreeSet::new();
         let mut stuck = Vec::new();
         for (title, record) in records

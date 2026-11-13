@@ -9,6 +9,14 @@ fn event(event_type: &str, episode: Option<i64>, movie: Option<i64>) -> HistoryR
         event_type: event_type.to_owned(),
         episode_id: episode,
         movie_id: movie,
+        album_id: None,
+    }
+}
+
+fn album(event_type: &str, album: i64) -> HistoryRecord {
+    HistoryRecord {
+        album_id: Some(album),
+        ..event(event_type, None, None)
     }
 }
 
@@ -23,11 +31,14 @@ fn grabs_are_counted_per_item_since_it_last_imported() {
         event("grabbed", None, Some(9)),
         event("somethingElse", None, Some(9)),
         event("grabbed", None, None),
+        album("grabbed", 30),
+        album("grabbed", 30),
     ];
     let grabs = counted(&history);
     assert_eq!(grabs.get(&1), Some(&2));
     assert_eq!(grabs.get(&9), Some(&1));
-    assert_eq!(grabs.len(), 2);
+    assert_eq!(grabs.get(&30), Some(&2));
+    assert_eq!(grabs.len(), 3);
     assert!(counted(&[]).is_empty());
 }
 

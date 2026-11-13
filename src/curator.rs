@@ -2,14 +2,17 @@
 
 use async_trait::async_trait;
 use lemonfiber_ports::http::Method;
-use lemonfiber_ports::media::{Format, Kind};
-use lemonfiber_ports::service::{Failure, Maintenance, MusicQuality, Record, RootFolder};
+use lemonfiber_ports::media::{Format, Kind, TitleKind};
+use lemonfiber_ports::service::{
+    Failure, Maintenance, MusicQuality, Record, Recounting, RootFolder,
+};
 
 use crate::client::Servarr;
 
 mod carrying;
 mod catalogue;
 mod clients;
+mod filed;
 mod fulfilling;
 mod grabs;
 mod importing;
@@ -19,7 +22,10 @@ mod queue;
 mod releases;
 mod wire;
 
+use filed::Filed;
 use kind::Shape as _;
+
+const ARTIST_ID: &str = "artistId";
 
 const COMMAND: &str = "/command";
 
@@ -53,12 +59,11 @@ fn newest_history(size: usize) -> String {
     format!("/history?page=1&pageSize={size}&sortKey=date&sortDirection=descending")
 }
 
-/// What one curator files: the kind of video it is asked about, if any, and the records
-/// it holds.
+/// What one curator files: the kind of title it is asked about and the records it holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Files {
-    /// The kind of video it files, or none for a curator of music.
-    pub kind: Option<Kind>,
+    /// The kind of title it files.
+    pub kind: TitleKind,
     /// The records it holds.
     pub record: Record,
 }
@@ -66,19 +71,19 @@ pub struct Files {
 impl Files {
     /// What a curator of television files.
     pub const TELEVISION: Self = Self {
-        kind: Some(Kind::Tv),
+        kind: TitleKind::Tv,
         record: Record::Series,
     };
 
     /// What a curator of films files.
     pub const FILMS: Self = Self {
-        kind: Some(Kind::Movies),
+        kind: TitleKind::Movies,
         record: Record::Film,
     };
 
     /// What a curator of music files.
     pub const MUSIC: Self = Self {
-        kind: None,
+        kind: TitleKind::Music,
         record: Record::Artist,
     };
 }
@@ -111,6 +116,8 @@ pub trait Music: Send + Sync {
 
 const FILES_NO_MUSIC: &str = "it files no music";
 
+const TELLS_NOTHING: &str = "this adapter does not hear what its upstream did yet";
+
 /// A curator of no music.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoMusic;
@@ -142,13 +149,21 @@ impl<M: Music> Curator<M> {
     }
 
     fn filing(&self, kind: Kind) -> Result<Kind, Failure> {
-        if self.files.kind == Some(kind) {
+        if self.files.kind == TitleKind::from(kind) {
             Ok(kind)
         } else {
-            Err(self
-                .servarr
-                .unsupported(&format!("it files no {}", kind.noun())))
+            Err(self.files_no(kind.noun()))
         }
+    }
+
+    fn filed(&self, kind: TitleKind) -> Result<Filed, Failure> {
+        Filed::of(kind)
+            .filter(|_| self.files.kind == kind)
+            .ok_or_else(|| self.files_no(kind.noun()))
+    }
+
+    fn files_no(&self, noun: &str) -> Failure {
+        self.servarr.unsupported(&format!("it files no {noun}"))
     }
 
     fn holding(&self, record: Record) -> Result<Record, Failure> {
@@ -186,6 +201,18 @@ struct Wanted {
 impl<M: Music> MusicQuality for Curator<M> {
     async fn apply_music_format(&self, format: Format) -> Result<(), Failure> {
         self.music.apply(&self.servarr, format).await
+    }
+}
+
+#[async_trait]
+impl<M: Music> Recounting for Curator<M> {
+    async fn events(
+        &self,
+        _address: Option<&str>,
+        _pin: Option<&str>,
+        _key: Option<&str>,
+    ) -> Result<(), Failure> {
+        Err(self.servarr.unsupported(TELLS_NOTHING))
     }
 }
 

@@ -1,6 +1,6 @@
-use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::{DownloadState, DownloadedEpisode, Downloading};
 
+use super::super::filed::Filed;
 use super::super::queue::is_stuck;
 use super::super::wire::QueueRecord;
 
@@ -14,8 +14,8 @@ const STATES: [(&str, DownloadState); 5] = [
     ("completed", DownloadState::Completed),
 ];
 
-pub(super) fn downloading(kind: Kind, record: QueueRecord) -> Option<Downloading> {
-    let title_id = record.owner(kind)?;
+pub(super) fn downloading(filed: Filed, record: QueueRecord) -> Option<Downloading> {
+    let title_id = record.owner(filed)?;
     let state = state(&record);
     Some(Downloading {
         title_id,

@@ -1,6 +1,6 @@
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::digest::sha256;
-use lemonfiber_ports::media::Kind;
+use lemonfiber_ports::media::TitleKind;
 use lemonfiber_ports::service::stage::{Outcome, Stage, HISTORY_HORIZON};
 use lemonfiber_ports::service::{FoundItem, ItemPart, Pipeline, QueueItem, StuckItem, TraceEvent};
 
@@ -15,7 +15,7 @@ const LIBRARY: &str = r#"[
 #[tokio::test]
 async fn the_library_says_each_item_and_the_year_it_came_out_where_known() {
     let fake = Fake::always(Answer::reply(200, LIBRARY));
-    let library = television(&fake).library(Kind::Tv).await;
+    let library = television(&fake).library(TitleKind::Tv).await;
     assert_eq!(
         library.ok().map(|all| all
             .into_iter()
@@ -34,7 +34,10 @@ async fn the_library_says_each_item_and_the_year_it_came_out_where_known() {
 async fn items_are_found_in_the_library_by_their_title_whatever_its_case() {
     let fake = Fake::always(Answer::reply(200, LIBRARY));
     assert_eq!(
-        films(&fake).find_items(Kind::Movies, "BUNNY").await.ok(),
+        films(&fake)
+            .find_items(TitleKind::Movies, "BUNNY")
+            .await
+            .ok(),
         Some(vec![FoundItem {
             id: 1,
             title: "Big Buck Bunny".to_owned(),
@@ -55,7 +58,7 @@ async fn an_items_history_keeps_the_events_it_knows_newest_first() {
             {"eventType":"grabbed","date":"2026-10-01T10:00:00Z","episodeId":31}
         ]}"#,
     ));
-    let history = television(&fake).item_history(Kind::Tv, 7).await;
+    let history = television(&fake).item_history(TitleKind::Tv, 7).await;
     assert_eq!(
         history.ok(),
         Some(vec![
@@ -83,7 +86,7 @@ async fn an_items_history_keeps_the_events_it_knows_newest_first() {
 async fn a_films_history_is_asked_for_by_its_movie() {
     let fake = Fake::always(Answer::reply(200, r#"{"records":[]}"#));
     assert_eq!(
-        films(&fake).item_history(Kind::Movies, 4).await.ok(),
+        films(&fake).item_history(TitleKind::Movies, 4).await.ok(),
         Some(Vec::new())
     );
     assert!(asked(&fake).iter().all(|url| url.ends_with("&movieIds=4")));
@@ -109,7 +112,7 @@ async fn an_items_queue_is_read_across_every_page_for_that_item_alone() {
             ),
         ),
     ]);
-    let queued = television(&fake).item_queue(Kind::Tv, 7).await;
+    let queued = television(&fake).item_queue(TitleKind::Tv, 7).await;
     assert_eq!(
         queued.ok(),
         Some(vec![QueueItem {
@@ -134,7 +137,7 @@ async fn a_film_in_the_queue_in_a_state_it_does_not_name_is_downloading() {
         r#"{"totalRecords":2,"records":[{"movieId":4,"trackedDownloadState":"somethingNew","trackedDownloadStatus":"ok"},{"movieId":5}]}"#,
     ));
     assert_eq!(
-        films(&fake).item_queue(Kind::Movies, 4).await.ok(),
+        films(&fake).item_queue(TitleKind::Movies, 4).await.ok(),
         Some(vec![QueueItem {
             part: None,
             stage: Stage::Downloading,
@@ -151,7 +154,7 @@ async fn the_parts_of_a_series_are_read_in_one_season_or_all() {
     ));
     let curator = television(&fake);
     assert_eq!(
-        curator.item_parts(Kind::Tv, 7, Some(1)).await.ok(),
+        curator.item_parts(TitleKind::Tv, 7, Some(1)).await.ok(),
         Some(vec![ItemPart {
             id: 31,
             season: 1,
@@ -161,7 +164,7 @@ async fn the_parts_of_a_series_are_read_in_one_season_or_all() {
             has_file: true,
         }])
     );
-    assert!(curator.item_parts(Kind::Tv, 7, None).await.is_ok());
+    assert!(curator.item_parts(TitleKind::Tv, 7, None).await.is_ok());
     assert_eq!(
         asked(&fake),
         [
@@ -175,7 +178,10 @@ async fn the_parts_of_a_series_are_read_in_one_season_or_all() {
 async fn a_film_has_no_parts_and_nothing_is_asked_for_them() {
     let fake = Fake::silent();
     assert_eq!(
-        films(&fake).item_parts(Kind::Movies, 4, None).await.ok(),
+        films(&fake)
+            .item_parts(TitleKind::Movies, 4, None)
+            .await
+            .ok(),
         Some(Vec::new())
     );
     assert!(asked(&fake).is_empty());
@@ -193,7 +199,7 @@ async fn each_stuck_item_is_named_once_by_its_title() {
         ]}"#,
     ));
     assert_eq!(
-        television(&fake).stuck_items(Kind::Tv).await.ok(),
+        television(&fake).stuck_items(TitleKind::Tv).await.ok(),
         Some(vec![StuckItem {
             title: "Show".to_owned(),
             stage: Stage::of_queue_state("importPending").unwrap_or(Stage::Downloading),
@@ -234,7 +240,7 @@ async fn a_stuck_item_names_its_queue_entry_its_title_and_the_fingerprint_of_the
     ]);
     assert_eq!(
         television(&fake)
-            .stuck_items(Kind::Tv)
+            .stuck_items(TitleKind::Tv)
             .await
             .ok()
             .map(|all| all
@@ -271,7 +277,7 @@ async fn a_stuck_item_whose_grab_history_cannot_be_read_is_a_failure() {
         ),
         ("/history?", Answer::reply(500, "")),
     ]);
-    assert!(television(&fake).stuck_items(Kind::Tv).await.is_err());
+    assert!(television(&fake).stuck_items(TitleKind::Tv).await.is_err());
 }
 
 #[tokio::test]
@@ -282,7 +288,7 @@ async fn a_stuck_film_is_named_by_its_movie() {
     ));
     assert_eq!(
         films(&fake)
-            .stuck_items(Kind::Movies)
+            .stuck_items(TitleKind::Movies)
             .await
             .ok()
             .map(|all| all.into_iter().map(|one| one.title).collect::<Vec<_>>()),
@@ -294,12 +300,12 @@ async fn a_stuck_film_is_named_by_its_movie() {
 async fn what_cannot_be_read_is_a_failure() {
     let fake = Fake::always(Answer::reply(200, "{}"));
     let curator = television(&fake);
-    assert!(curator.library(Kind::Tv).await.is_err());
-    assert!(curator.find_items(Kind::Tv, "x").await.is_err());
-    assert!(curator.item_parts(Kind::Tv, 7, None).await.is_err());
+    assert!(curator.library(TitleKind::Tv).await.is_err());
+    assert!(curator.find_items(TitleKind::Tv, "x").await.is_err());
+    assert!(curator.item_parts(TitleKind::Tv, 7, None).await.is_err());
     let fake = Fake::always(Answer::reply(500, ""));
     let curator = television(&fake);
-    assert!(curator.item_history(Kind::Tv, 7).await.is_err());
-    assert!(curator.item_queue(Kind::Tv, 7).await.is_err());
-    assert!(curator.stuck_items(Kind::Tv).await.is_err());
+    assert!(curator.item_history(TitleKind::Tv, 7).await.is_err());
+    assert!(curator.item_queue(TitleKind::Tv, 7).await.is_err());
+    assert!(curator.stuck_items(TitleKind::Tv).await.is_err());
 }

@@ -1,7 +1,7 @@
 use lemonfiber_fixtures::http::{Answer, Fake};
 use lemonfiber_ports::digest::sha256;
 use lemonfiber_ports::http::Method;
-use lemonfiber_ports::media::Kind;
+use lemonfiber_ports::media::TitleKind;
 use lemonfiber_ports::service::{Failure, Fulfilling, Grabbed};
 use serde_json::json;
 
@@ -59,7 +59,7 @@ async fn a_queue_entry_is_removed_from_its_client_blocklisted_where_asked_and_an
         ]);
         assert_eq!(
             television(&fake)
-                .unqueue(Kind::Tv, 51, blocklist)
+                .unqueue(TitleKind::Tv, 51, blocklist)
                 .await
                 .ok(),
             Some(fingerprint())
@@ -81,7 +81,7 @@ async fn a_queue_entry_is_removed_from_its_client_blocklisted_where_asked_and_an
 async fn a_queue_entry_it_does_not_hold_is_refused_and_nothing_is_removed() {
     let fake = Fake::by_path(vec![("/queue?", Answer::reply(200, QUEUED))]);
     assert!(refused(
-        films(&fake).unqueue(Kind::Movies, 9, true).await,
+        films(&fake).unqueue(TitleKind::Movies, 9, true).await,
         "it holds no queue entry 9"
     ));
     assert!(deleted(&fake).is_empty());
@@ -98,7 +98,7 @@ async fn a_queue_entry_with_no_grab_to_fingerprint_is_refused_and_nothing_is_rem
             ("/history?", Answer::reply(200, history)),
         ]);
         assert!(refused(
-            television(&fake).unqueue(Kind::Tv, 51, true).await,
+            television(&fake).unqueue(TitleKind::Tv, 51, true).await,
             "its history holds no grab of queue entry 51"
         ));
         assert!(deleted(&fake).is_empty());
@@ -108,12 +108,18 @@ async fn a_queue_entry_with_no_grab_to_fingerprint_is_refused_and_nothing_is_rem
 #[tokio::test]
 async fn a_queue_entry_that_cannot_be_read_fingerprinted_or_removed_is_a_failure() {
     let fake = Fake::always(Answer::reply(500, ""));
-    assert!(television(&fake).unqueue(Kind::Tv, 51, true).await.is_err());
+    assert!(television(&fake)
+        .unqueue(TitleKind::Tv, 51, true)
+        .await
+        .is_err());
     let fake = Fake::by_path(vec![
         ("/queue?", Answer::reply(200, QUEUED)),
         ("/history?", Answer::reply(500, "")),
     ]);
-    assert!(television(&fake).unqueue(Kind::Tv, 51, true).await.is_err());
+    assert!(television(&fake)
+        .unqueue(TitleKind::Tv, 51, true)
+        .await
+        .is_err());
     assert!(deleted(&fake).is_empty());
     let fake = Fake::by_rules(vec![
         (Some(Method::Get), "/queue?", Answer::reply(200, QUEUED)),
@@ -124,18 +130,25 @@ async fn a_queue_entry_that_cannot_be_read_fingerprinted_or_removed_is_a_failure
         ),
         (Some(Method::Delete), "/queue/51", Answer::reply(500, "")),
     ]);
-    assert!(television(&fake).unqueue(Kind::Tv, 51, true).await.is_err());
+    assert!(television(&fake)
+        .unqueue(TitleKind::Tv, 51, true)
+        .await
+        .is_err());
 }
 
 #[tokio::test]
 async fn a_kind_it_does_not_file_is_neither_unqueued_nor_grabbed() {
     let fake = Fake::silent();
     assert!(unsupported(
-        television(&fake).unqueue(Kind::Movies, 1, true).await
+        television(&fake).unqueue(TitleKind::Movies, 1, true).await
     ));
-    assert!(unsupported(films(&fake).grab(Kind::Tv, 1, "f").await));
-    assert!(unsupported(music(&fake).unqueue(Kind::Tv, 1, false).await));
-    assert!(unsupported(music(&fake).grab(Kind::Movies, 1, "f").await));
+    assert!(unsupported(films(&fake).grab(TitleKind::Tv, 1, "f").await));
+    assert!(unsupported(
+        music(&fake).unqueue(TitleKind::Tv, 1, false).await
+    ));
+    assert!(unsupported(
+        music(&fake).grab(TitleKind::Movies, 1, "f").await
+    ));
     assert!(fake.requests().is_empty());
 }
 
@@ -146,7 +159,9 @@ async fn a_title_it_does_not_hold_is_refused_before_anything_is_lifted_or_search
         ("/system/status", Answer::reply(200, "{}")),
     ]);
     assert!(refused(
-        films(&fake).grab(Kind::Movies, 7, &fingerprint()).await,
+        films(&fake)
+            .grab(TitleKind::Movies, 7, &fingerprint())
+            .await,
         "it holds no film as 7"
     ));
     assert_eq!(asked(&fake), [api("/movie/7"), api("/system/status")]);
@@ -193,7 +208,7 @@ async fn an_episode_s_release_has_its_blocklist_entry_lifted_and_is_grabbed_from
     ]);
     assert_eq!(
         television(&fake)
-            .grab(Kind::Tv, 4, &fingerprint())
+            .grab(TitleKind::Tv, 4, &fingerprint())
             .await
             .ok(),
         Some(Grabbed::Grabbed)
@@ -238,7 +253,7 @@ async fn a_release_grabbed_for_several_episodes_is_searched_for_by_their_season(
     ]);
     assert_eq!(
         television(&fake)
-            .grab(Kind::Tv, 4, &fingerprint())
+            .grab(TitleKind::Tv, 4, &fingerprint())
             .await
             .ok(),
         Some(Grabbed::Gone)
@@ -274,7 +289,7 @@ async fn an_episode_s_release_with_no_grab_naming_its_episode_is_gone_and_nothin
         ]);
         assert_eq!(
             television(&fake)
-                .grab(Kind::Tv, 4, &fingerprint())
+                .grab(TitleKind::Tv, 4, &fingerprint())
                 .await
                 .ok(),
             Some(Grabbed::Gone)
@@ -297,7 +312,7 @@ async fn a_film_s_release_is_searched_for_by_its_film_and_grabbed_where_offered(
     ]);
     assert_eq!(
         films(&fake)
-            .grab(Kind::Movies, 7, &fingerprint())
+            .grab(TitleKind::Movies, 7, &fingerprint())
             .await
             .ok(),
         Some(Grabbed::Grabbed)
@@ -337,7 +352,7 @@ async fn a_release_no_indexer_offers_any_more_is_gone_and_nothing_is_grabbed() {
     ]);
     assert_eq!(
         films(&fake)
-            .grab(Kind::Movies, 7, &fingerprint())
+            .grab(TitleKind::Movies, 7, &fingerprint())
             .await
             .ok(),
         Some(Grabbed::Gone)
@@ -381,7 +396,7 @@ async fn a_grab_whose_history_blocklist_search_or_grab_fails_is_a_failure() {
         let fake = failing(at);
         assert!(
             television(&fake)
-                .grab(Kind::Tv, 4, &fingerprint())
+                .grab(TitleKind::Tv, 4, &fingerprint())
                 .await
                 .is_err(),
             "{at}"

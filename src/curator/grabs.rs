@@ -1,14 +1,16 @@
 use lemonfiber_adapter_kit::endpoint::form_encoded;
 use lemonfiber_ports::digest::sha256;
-use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::Failure;
 use serde::Deserialize;
 
+use super::filed::Filed;
 use super::kind::Shape as _;
 use super::wire::QueueRecord;
-use super::{Curator, Music};
+use super::{Curator, Music, ARTIST_ID};
 
 const GRAB_EVENT: u8 = 1;
+
+const ARTIST_HISTORY: &str = "/history/artist";
 
 const THE_GRABS: &str = "the grab history";
 
@@ -76,26 +78,34 @@ impl<M: Music> Curator<M> {
 
     pub(crate) async fn grabs_of(
         &self,
-        kind: Kind,
+        filed: Filed,
         id: i64,
+        artist: i64,
         release: &str,
     ) -> Result<Vec<Grab>, Failure> {
         let grabs: Vec<Grab> = self
             .servarr
-            .read(
-                &format!(
-                    "/history/{}?{}={id}&eventType={GRAB_EVENT}{}",
-                    kind.library_endpoint(),
-                    kind.owner_param(),
-                    kind.episode_detail()
-                ),
-                THE_GRABS,
-            )
+            .read(&grab_history(filed, id, artist), THE_GRABS)
             .await?;
         Ok(grabs
             .into_iter()
             .filter(|grab| grab.fingerprint().as_deref() == Some(release))
             .collect())
+    }
+}
+
+fn grab_history(filed: Filed, id: i64, artist: i64) -> String {
+    match filed {
+        Filed::Video(kind) => format!(
+            "/history/{}?{}={id}&eventType={GRAB_EVENT}{}",
+            kind.library_endpoint(),
+            kind.owner_param(),
+            kind.episode_detail()
+        ),
+        Filed::Album => format!(
+            "{ARTIST_HISTORY}?{ARTIST_ID}={artist}&{}={id}&eventType={GRAB_EVENT}",
+            filed.owner_param()
+        ),
     }
 }
 

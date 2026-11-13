@@ -2,6 +2,7 @@ use lemonfiber_ports::media::Kind;
 use lemonfiber_ports::service::DownloadState;
 
 use super::downloading;
+use crate::curator::filed::Filed;
 use crate::curator::wire::QueueRecord;
 
 fn record(said: serde_json::Value) -> Option<QueueRecord> {
@@ -15,7 +16,7 @@ fn state(status: &str, tracked: &str, tracking: &str) -> Option<DownloadState> {
         "trackedDownloadStatus": tracked,
         "trackedDownloadState": tracking,
     }))
-    .and_then(|one| downloading(Kind::Tv, one))
+    .and_then(|one| downloading(Filed::Video(Kind::Tv), one))
     .map(|one| one.state)
 }
 
@@ -63,7 +64,7 @@ fn where_a_download_stands_is_read_from_its_status_and_how_the_curator_tracks_it
 fn a_size_is_read_whole_or_rounded_and_nothing_that_is_no_size() {
     let sizes = |size: serde_json::Value| {
         record(serde_json::json!({ "movieId": 7, "size": size, "sizeleft": size }))
-            .and_then(|one| downloading(Kind::Movies, one))
+            .and_then(|one| downloading(Filed::Video(Kind::Movies), one))
             .map(|one| (one.bytes, one.left))
     };
     assert_eq!(sizes(serde_json::json!(12)), Some((12, 12)));
@@ -77,6 +78,6 @@ fn a_size_is_read_whole_or_rounded_and_nothing_that_is_no_size() {
 fn a_download_for_no_title_of_its_kind_is_not_one() {
     let for_a_film = record(serde_json::json!({ "movieId": 7 }));
     assert!(for_a_film
-        .and_then(|one| downloading(Kind::Tv, one))
+        .and_then(|one| downloading(Filed::Video(Kind::Tv), one))
         .is_none());
 }

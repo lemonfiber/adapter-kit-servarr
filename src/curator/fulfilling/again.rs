@@ -5,9 +5,11 @@ use lemonfiber_ports::service::{Failure, Grabbed};
 use serde::Deserialize;
 use serde_json::json;
 
+use super::super::filed::Filed;
 use super::super::grabs::Grab;
 use super::super::kind::Shape as _;
 use super::super::queue::QUEUE;
+use super::super::wire::Page;
 use super::super::{Curator, Music, RELEASE, THE_RELEASE_SEARCH};
 
 const BLOCKLIST: &str = "/blocklist";
@@ -24,18 +26,14 @@ struct Blocked {
     source_title: String,
     #[serde(default)]
     indexer: Option<String>,
+    #[serde(default)]
+    album_ids: Vec<i64>,
 }
 
 impl Blocked {
     fn is_of(&self, grab: &Grab) -> bool {
         self.source_title == grab.source_title && self.indexer == grab.data.indexer
     }
-}
-
-#[derive(Deserialize)]
-struct BlockedPage {
-    #[serde(default)]
-    records: Vec<Blocked>,
 }
 
 #[derive(Deserialize)]
@@ -47,14 +45,19 @@ struct Offered {
     indexer_id: i64,
 }
 
-fn searched_by(kind: Kind, id: i64, grabs: &[Grab]) -> Option<String> {
-    match (kind, grabs) {
-        (Kind::Movies, _) => Some(format!("{RELEASE}?{}={id}", kind.owner_param())),
-        (Kind::Tv, []) => None,
-        (Kind::Tv, [one]) => one
+fn searched_by(filed: Filed, id: i64, grabs: &[Grab]) -> Option<String> {
+    let kind = match filed {
+        Filed::Video(Kind::Movies) | Filed::Album => {
+            return Some(format!("{RELEASE}?{}={id}", filed.owner_param()));
+        }
+        Filed::Video(kind) => kind,
+    };
+    match grabs {
+        [] => None,
+        [one] => one
             .episode_id
             .map(|episode| format!("{RELEASE}?{}={episode}", kind.release_id_param())),
-        (Kind::Tv, [first, ..]) => first.episode.as_ref().map(|episode| {
+        [first, ..] => first.episode.as_ref().map(|episode| {
             format!(
                 "{RELEASE}?{}={id}&seasonNumber={}",
                 kind.owner_param(),
@@ -95,13 +98,14 @@ impl<M: Music> Curator<M> {
 
     pub(super) async fn grabbed_again(
         &self,
-        kind: Kind,
+        filed: Filed,
         id: i64,
+        artist: i64,
         release: &str,
     ) -> Result<Grabbed, Failure> {
-        let grabs = self.grabs_of(kind, id, release).await?;
-        self.lifted(kind, id, &grabs).await?;
-        let Some(search) = searched_by(kind, id, &grabs) else {
+        let grabs = self.grabs_of(filed, id, artist, release).await?;
+        self.lifted(filed, id, &grabs).await?;
+        let Some(search) = searched_by(filed, id, &grabs) else {
             return Ok(Grabbed::Gone);
         };
         let offered: Vec<Offered> = self.servarr.read(&search, THE_RELEASE_SEARCH).await?;
@@ -119,7 +123,7 @@ impl<M: Music> Curator<M> {
                     json!({
                         "guid": found.guid,
                         "indexerId": found.indexer_id,
-                        kind.owner_param(): id,
+                        filed.owner_param(): id,
                     })
                     .to_string(),
                 ),
@@ -128,22 +132,28 @@ impl<M: Music> Curator<M> {
         Ok(Grabbed::Grabbed)
     }
 
-    async fn lifted(&self, kind: Kind, id: i64, grabs: &[Grab]) -> Result<(), Failure> {
+    async fn lifted(&self, filed: Filed, id: i64, grabs: &[Grab]) -> Result<(), Failure> {
         if grabs.is_empty() {
             return Ok(());
         }
-        let blocked: BlockedPage = self
-            .servarr
-            .read(
-                &format!(
-                    "{BLOCKLIST}?page=1&pageSize={BLOCKLIST_PAGE}&{}={id}",
-                    kind.history_filter()
-                ),
-                THE_BLOCKLIST,
-            )
-            .await?;
+        let blocked = match filed.blocklist_filter() {
+            Some(filter) => {
+                self.servarr
+                    .read::<Page<Blocked>>(
+                        &format!("{BLOCKLIST}?page=1&pageSize={BLOCKLIST_PAGE}&{filter}={id}"),
+                        THE_BLOCKLIST,
+                    )
+                    .await?
+                    .records
+            }
+            None => self
+                .paged::<Blocked>(BLOCKLIST, BLOCKLIST_PAGE, "", THE_BLOCKLIST)
+                .await?
+                .into_iter()
+                .filter(|entry| entry.album_ids.contains(&id))
+                .collect(),
+        };
         for entry in blocked
-            .records
             .iter()
             .filter(|entry| grabs.iter().any(|grab| entry.is_of(grab)))
         {

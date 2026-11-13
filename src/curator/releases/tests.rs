@@ -1,5 +1,5 @@
 use lemonfiber_fixtures::http::{Answer, Fake};
-use lemonfiber_ports::media::Kind;
+use lemonfiber_ports::media::TitleKind;
 use lemonfiber_ports::service::{QualityReleases, ReleaseProbe};
 
 use crate::testing::{api, asked, films, television};
@@ -26,7 +26,7 @@ async fn the_first_wanted_item_is_searched_and_what_it_would_grab_said() {
     ] {
         let fake = probing(releases);
         assert_eq!(
-            television(&fake).probe_releases(Kind::Tv).await.ok(),
+            television(&fake).probe_releases(TitleKind::Tv).await.ok(),
             Some(said)
         );
         assert_eq!(
@@ -38,7 +38,7 @@ async fn the_first_wanted_item_is_searched_and_what_it_would_grab_said() {
         );
     }
     let fake = probing("[]");
-    assert!(films(&fake).probe_releases(Kind::Movies).await.is_ok());
+    assert!(films(&fake).probe_releases(TitleKind::Movies).await.is_ok());
     assert!(asked(&fake).contains(&api("/release?movieId=31")));
 }
 
@@ -46,7 +46,7 @@ async fn the_first_wanted_item_is_searched_and_what_it_would_grab_said() {
 async fn nothing_wanted_searches_nothing() {
     let fake = Fake::always(Answer::reply(200, r#"{"records":[]}"#));
     assert_eq!(
-        television(&fake).probe_releases(Kind::Tv).await.ok(),
+        television(&fake).probe_releases(TitleKind::Tv).await.ok(),
         Some(ReleaseProbe::NothingWanted)
     );
     assert_eq!(asked(&fake).len(), 1);
