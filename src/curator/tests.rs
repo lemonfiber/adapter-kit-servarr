@@ -19,7 +19,10 @@ fn unsupported(refused: Result<impl std::fmt::Debug, Failure>, said: &str) -> bo
 #[tokio::test]
 async fn an_upgrade_search_is_posted_as_the_command_for_the_kind_it_files() {
     let fake = Fake::always(Answer::reply(201, "{}"));
-    assert!(television(&fake).search_upgrades(Kind::Tv).await.is_ok());
+    assert!(television(&fake)
+        .search_upgrades(TitleKind::Tv)
+        .await
+        .is_ok());
     let sent = fake.request();
     assert!(sent
         .as_ref()
@@ -27,11 +30,26 @@ async fn an_upgrade_search_is_posted_as_the_command_for_the_kind_it_files() {
     assert_eq!(at(&sent_body(sent), "/name"), "CutoffUnmetEpisodeSearch");
 
     let fake = Fake::always(Answer::reply(201, "{}"));
-    assert!(films(&fake).search_upgrades(Kind::Movies).await.is_ok());
+    assert!(films(&fake)
+        .search_upgrades(TitleKind::Movies)
+        .await
+        .is_ok());
     assert_eq!(
         at(&sent_body(fake.request()), "/name"),
         "CutoffUnmetMoviesSearch"
     );
+
+    let fake = Fake::always(Answer::reply(201, "{}"));
+    assert!(music(&fake).search_upgrades(TitleKind::Music).await.is_ok());
+    assert_eq!(
+        at(&sent_body(fake.request()), "/name"),
+        "CutoffUnmetAlbumSearch"
+    );
+    let fake = Fake::always(Answer::reply(201, "{}"));
+    assert!(unsupported(
+        music(&fake).search_upgrades(TitleKind::Books).await,
+        "it files no book"
+    ));
 }
 
 #[tokio::test]
@@ -65,7 +83,7 @@ async fn a_wanted_list_it_cannot_read_is_a_failure() {
 async fn a_kind_it_does_not_file_is_refused_before_anything_is_asked() {
     let fake = Fake::always(Answer::reply(200, "[]"));
     assert!(unsupported(
-        television(&fake).search_upgrades(Kind::Movies).await,
+        television(&fake).search_upgrades(TitleKind::Movies).await,
         "it files no film"
     ));
     assert!(unsupported(

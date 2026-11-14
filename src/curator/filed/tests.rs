@@ -449,7 +449,7 @@ async fn no_curator_tells_the_core_what_its_upstream_did_yet() {
     for curator in [television(&fake), films(&fake), music(&fake)] {
         assert!(matches!(
             curator
-                .events(Some("https://core"), Some("pin"), Some("key"))
+                .events(Some("https://core"), Some("pin"), Some("key"), Some(60))
                 .await,
             Err(Failure::Unsupported { .. })
         ));

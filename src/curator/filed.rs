@@ -10,6 +10,8 @@ const ALBUM_ID: &str = "albumId";
 
 const ALBUM_SEARCH: &str = "AlbumSearch";
 
+const ALBUM_UPGRADES: &str = "CutoffUnmetAlbumSearch";
+
 const WITH_VIDEO: &str = "&includeSeries=true&includeMovie=true";
 
 const WITH_ALBUM: &str = "&includeAlbum=true";
@@ -40,6 +42,13 @@ impl Filed {
         match self {
             Self::Video(kind) => kind.noun(),
             Self::Album => TitleKind::Music.noun(),
+        }
+    }
+
+    pub(crate) fn upgrade_command(self) -> &'static str {
+        match self {
+            Self::Video(kind) => kind.upgrade_command(),
+            Self::Album => ALBUM_UPGRADES,
         }
     }
 

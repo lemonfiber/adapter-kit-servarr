@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use lemonfiber_ports::http::Method;
 use lemonfiber_ports::media::{Format, Kind, TitleKind};
 use lemonfiber_ports::service::{
-    Failure, Maintenance, MusicQuality, Record, Recounting, RootFolder,
+    CutoffUnmet, Failure, Heard, Maintenance, MusicQuality, Record, Recounting, RootFolder,
 };
 
 use crate::client::Servarr;
@@ -12,6 +12,7 @@ use crate::client::Servarr;
 mod carrying;
 mod catalogue;
 mod clients;
+mod cutoff;
 mod filed;
 mod fulfilling;
 mod grabs;
@@ -23,7 +24,6 @@ mod releases;
 mod wire;
 
 use filed::Filed;
-use kind::Shape as _;
 
 const ARTIST_ID: &str = "artistId";
 
@@ -179,10 +179,14 @@ impl<M: Music> Curator<M> {
 
 #[async_trait]
 impl<M: Music> Maintenance for Curator<M> {
-    async fn search_upgrades(&self, kind: Kind) -> Result<(), Failure> {
-        let kind = self.filing(kind)?;
-        let body = serde_json::json!({ "name": kind.upgrade_command() }).to_string();
+    async fn search_upgrades(&self, kind: TitleKind) -> Result<(), Failure> {
+        let filed = self.filed(kind)?;
+        let body = serde_json::json!({ "name": filed.upgrade_command() }).to_string();
         self.servarr.done(Method::Post, COMMAND, Some(body)).await
+    }
+
+    async fn cutoff_unmet(&self, kind: TitleKind) -> Result<CutoffUnmet, Failure> {
+        cutoff::below(&self.servarr, self.filed(kind)?).await
     }
 
     async fn wanting(&self) -> Result<bool, Failure> {
@@ -211,7 +215,8 @@ impl<M: Music> Recounting for Curator<M> {
         _address: Option<&str>,
         _pin: Option<&str>,
         _key: Option<&str>,
-    ) -> Result<(), Failure> {
+        _every: Option<u32>,
+    ) -> Result<Option<Heard>, Failure> {
         Err(self.servarr.unsupported(TELLS_NOTHING))
     }
 }
