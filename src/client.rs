@@ -91,6 +91,7 @@ impl Servarr {
             headers: Vec::new(),
             body: None,
             pinned: None,
+            deadline: None,
         };
         self.endpoint
             .send(&ping)
@@ -143,6 +144,7 @@ impl Servarr {
             headers,
             body,
             pinned: None,
+            deadline: None,
         };
         self.endpoint.send(&request).await
     }
