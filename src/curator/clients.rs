@@ -33,18 +33,34 @@ struct Filed {
     grouped_as: &'static str,
 }
 
-const FILED: [Filed; 2] = [
+const USENET: &str = "usenet";
+
+const TORRENT: &str = "torrent";
+
+const FILED: [Filed; 4] = [
     Filed {
         spoken: ApiKind::Sabnzbd,
         implementation: "Sabnzbd",
         settings: "SabnzbdSettings",
-        grouped_as: "usenet",
+        grouped_as: USENET,
+    },
+    Filed {
+        spoken: ApiKind::Nzbget,
+        implementation: "Nzbget",
+        settings: "NzbgetSettings",
+        grouped_as: USENET,
     },
     Filed {
         spoken: ApiKind::Qbittorrent,
         implementation: "QBittorrent",
         settings: "QBittorrentSettings",
-        grouped_as: "torrent",
+        grouped_as: TORRENT,
+    },
+    Filed {
+        spoken: ApiKind::Transmission,
+        implementation: "Transmission",
+        settings: "TransmissionSettings",
+        grouped_as: TORRENT,
     },
 ];
 

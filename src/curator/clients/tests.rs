@@ -88,13 +88,58 @@ async fn a_torrent_client_is_posted_as_its_implementation_with_its_account() {
 }
 
 #[tokio::test]
+async fn each_client_signed_in_to_is_posted_as_its_own_implementation_and_group() {
+    for (protocol, implementation, settings, group) in [
+        ("nzbget", "Nzbget", "NzbgetSettings", "usenet"),
+        (
+            "transmission",
+            "Transmission",
+            "TransmissionSettings",
+            "torrent",
+        ),
+    ] {
+        let fake = Fake::always(Answer::reply(201, "{}"));
+        let signed_in = client(
+            protocol,
+            Credential::UserPass {
+                username: "admin".to_owned(),
+                password: "a-fixture-password".to_owned(),
+            },
+        );
+        assert!(television(&fake)
+            .register_download_client(&signed_in)
+            .await
+            .is_ok());
+        assert_eq!(
+            sent_body(fake.request()),
+            serde_json::json!({
+                "enable": true,
+                "protocol": group,
+                "name": "Fetcher",
+                "implementation": implementation,
+                "configContract": settings,
+                "priority": 1,
+                "fields": [
+                    { "name": "host", "value": "fetcher" },
+                    { "name": "port", "value": 8080 },
+                    { "name": "tvCategory", "value": "tv" },
+                    { "name": "username", "value": "admin" },
+                    { "name": "password", "value": "a-fixture-password" },
+                ],
+            }),
+            "{protocol}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn a_client_in_a_protocol_it_files_no_client_for_is_refused_before_anything_is_asked() {
     let fake = Fake::always(Answer::reply(201, "{}"));
     let refused = television(&fake)
-        .register_download_client(&client("nzbget", Credential::ApiKey("k".to_owned())))
+        .register_download_client(&client("deluge", Credential::ApiKey("k".to_owned())))
         .await;
     assert!(matches!(refused, Err(Failure::Unsupported { detail, .. })
-        if detail == "it files no download client spoken to as nzbget"));
+        if detail == "it files no download client spoken to as deluge"));
     assert!(asked(&fake).is_empty());
 }
 
