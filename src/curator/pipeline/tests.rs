@@ -3,6 +3,7 @@ use lemonfiber_ports::digest::sha256;
 use lemonfiber_ports::media::TitleKind;
 use lemonfiber_ports::service::stage::{Outcome, Stage, HISTORY_HORIZON};
 use lemonfiber_ports::service::{FoundItem, ItemPart, Pipeline, QueueItem, StuckItem, TraceEvent};
+use lemonfiber_ports::Instant;
 
 use crate::testing::{api, asked, films, television};
 
@@ -64,12 +65,12 @@ async fn an_items_history_keeps_the_events_it_knows_newest_first() {
         Some(vec![
             TraceEvent {
                 outcome: Outcome::Imported,
-                at: "2026-10-02T10:00:00Z".to_owned(),
+                at: Some(Instant::from_seconds(1_790_935_200)),
                 part: Some(31),
             },
             TraceEvent {
                 outcome: Outcome::Grabbed,
-                at: "2026-10-01T10:00:00Z".to_owned(),
+                at: Some(Instant::from_seconds(1_790_848_800)),
                 part: Some(31),
             },
         ])
