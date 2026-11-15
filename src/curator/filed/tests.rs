@@ -7,6 +7,7 @@ use lemonfiber_ports::service::{
     CuratedTitle, Failure, FoundItem, Fulfilling, Grabbed, Pipeline, QualityReleases, QueueItem,
     Recounting, ReleaseProbe, StuckItem, TraceEvent,
 };
+use lemonfiber_ports::Instant;
 use serde_json::json;
 
 use crate::curator::Files;
@@ -81,17 +82,17 @@ async fn an_album_s_history_is_read_by_its_own_id_and_names_no_part() {
             {"eventType":"grabbed","date":"2026-10-01T10:00:00Z","albumId":7,"trackId":0}
         ]}"#,
     ));
-    let event = |outcome, at: &str| TraceEvent {
+    let event = |outcome, at| TraceEvent {
         outcome,
-        at: at.to_owned(),
+        at: Some(Instant::from_seconds(at)),
         part: None,
     };
     assert_eq!(
         music(&fake).item_history(TitleKind::Music, 7).await.ok(),
         Some(vec![
-            event(Outcome::Removed, "2026-10-03T10:00:00Z"),
-            event(Outcome::Imported, "2026-10-02T10:00:00Z"),
-            event(Outcome::Grabbed, "2026-10-01T10:00:00Z"),
+            event(Outcome::Removed, 1_791_021_600),
+            event(Outcome::Imported, 1_790_935_200),
+            event(Outcome::Grabbed, 1_790_848_800),
         ])
     );
     assert_eq!(

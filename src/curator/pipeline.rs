@@ -7,6 +7,7 @@ use lemonfiber_ports::service::stage::{Outcome, Stage, HISTORY_HORIZON};
 use lemonfiber_ports::service::{
     Failure, FoundItem, ItemPart, Pipeline, QueueItem, StuckItem, TraceEvent,
 };
+use lemonfiber_ports::Instant;
 use serde::Deserialize;
 
 use super::queue::is_stuck;
@@ -113,7 +114,7 @@ impl<M: Music> Pipeline for Curator<M> {
             .filter_map(|record| {
                 Outcome::of_event(ApiKind::Servarr, &record.event_type).map(|outcome| TraceEvent {
                     outcome,
-                    at: record.date,
+                    at: Instant::from_service_text(&record.date),
                     part: record.episode_id,
                 })
             })
