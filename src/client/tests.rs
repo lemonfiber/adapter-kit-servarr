@@ -164,6 +164,41 @@ async fn nothing_held_at_a_path_is_none_while_its_versioned_prefix_is_served() {
 }
 
 #[tokio::test]
+async fn a_path_is_removed_or_found_holding_nothing_while_its_versioned_prefix_is_served() {
+    let fake = Fake::always(Answer::reply(200, ""));
+    assert!(servarr(&fake).removed("/downloadclient/7").await.is_ok());
+    assert!(fake
+        .request()
+        .is_some_and(|one| one.method == Method::Delete && one.url == api("/downloadclient/7")));
+
+    let fake = Fake::by_path(vec![
+        (
+            "/downloadclient/7",
+            Answer::reply(404, r#"{"title":"Not Found"}"#),
+        ),
+        ("/system/status", Answer::reply(200, "{}")),
+    ]);
+    assert!(servarr(&fake).removed("/downloadclient/7").await.is_ok());
+    assert_eq!(
+        asked(&fake),
+        [api("/downloadclient/7"), api("/system/status")]
+    );
+
+    let fake = Fake::always(Answer::reply(404, ""));
+    assert!(matches!(
+        servarr(&fake).removed("/downloadclient/7").await,
+        Err(Failure::Unsupported { detail, .. })
+            if detail == "there is no /api/v3/downloadclient/7; it may be a release this adapter does not speak"
+    ));
+
+    let fake = Fake::always(Answer::reply(400, r#"{"message":"in use"}"#));
+    assert!(matches!(
+        servarr(&fake).removed("/downloadclient/7").await,
+        Err(Failure::Refused { .. })
+    ));
+}
+
+#[tokio::test]
 async fn its_identity_is_its_instance_name_or_its_app_name_and_its_version() {
     let fake = Fake::always(Answer::reply(
         200,

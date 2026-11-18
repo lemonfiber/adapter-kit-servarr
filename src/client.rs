@@ -201,16 +201,35 @@ impl Servarr {
     ) -> Result<Option<T>, Failure> {
         let response = self.sent(Method::Get, path, None).await?;
         if response.status == NOT_SERVED {
-            let status = self.sent(Method::Get, STATUS, None).await?;
-            return if status.status == NOT_SERVED {
-                Err(self.not_served(path))
-            } else {
-                Ok(None)
-            };
+            return self.holding_nothing_at(path).await.map(|()| None);
         }
         self.endpoint
             .decode(&said_as_one(response), &format!("{what} could not be read"))
             .map(Some)
+    }
+
+    /// `path` under the versioned API deleted, or found holding nothing there already while
+    /// its versioned prefix is served.
+    ///
+    /// # Errors
+    ///
+    /// No key held, nothing answering, the versioned prefix not served, or the refusal a
+    /// non-success status amounts to.
+    pub async fn removed(&self, path: &str) -> Result<(), Failure> {
+        let response = self.sent(Method::Delete, path, None).await?;
+        if response.status == NOT_SERVED {
+            return self.holding_nothing_at(path).await;
+        }
+        self.endpoint.expect_success(&said_as_one(response))
+    }
+
+    async fn holding_nothing_at(&self, path: &str) -> Result<(), Failure> {
+        let status = self.sent(Method::Get, STATUS, None).await?;
+        if status.status == NOT_SERVED {
+            Err(self.not_served(path))
+        } else {
+            Ok(())
+        }
     }
 
     /// Who the service is and which release it runs.

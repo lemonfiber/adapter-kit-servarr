@@ -129,6 +129,15 @@ impl<M: Music> Client for Curator<M> {
             .await
     }
 
+    async fn forget_download_client(&self, id: &str) -> Result<(), Failure> {
+        let Ok(numeric) = id.parse::<i64>() else {
+            return Ok(());
+        };
+        self.servarr
+            .removed(&format!("{DOWNLOAD_CLIENTS}/{numeric}"))
+            .await
+    }
+
     async fn test_download_clients(&self) -> Result<Vec<ClientProbe>, Failure> {
         let response = self.servarr.ask(Method::Post, TEST_ALL, None).await?;
         let results: Vec<TestResource> = self.servarr.endpoint().decode(
