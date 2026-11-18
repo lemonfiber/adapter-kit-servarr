@@ -172,6 +172,25 @@ async fn an_id_the_service_does_not_assign_is_refused_before_anything_is_asked()
 }
 
 #[tokio::test]
+async fn a_client_is_forgotten_by_deleting_its_id() {
+    let fake = Fake::always(Answer::reply(200, ""));
+    assert!(television(&fake).forget_download_client("7").await.is_ok());
+    assert!(fake
+        .request()
+        .is_some_and(|one| one.method == Method::Delete && one.url == api("/downloadclient/7")));
+}
+
+#[tokio::test]
+async fn an_id_the_service_never_assigns_is_forgotten_without_asking() {
+    let fake = Fake::always(Answer::reply(200, ""));
+    assert!(television(&fake)
+        .forget_download_client("../system")
+        .await
+        .is_ok());
+    assert!(asked(&fake).is_empty());
+}
+
+#[tokio::test]
 async fn the_clients_it_holds_are_read_by_where_they_are_reached() {
     let fake = Fake::always(Answer::reply(
         200,
