@@ -130,7 +130,7 @@ impl<M: Music> Client for Curator<M> {
     }
 
     async fn forget_download_client(&self, id: &str) -> Result<(), Failure> {
-        let Ok(numeric) = id.parse::<i64>() else {
+        let Some(numeric) = id.parse::<i64>().ok().filter(|numeric| *numeric > 0) else {
             return Ok(());
         };
         self.servarr

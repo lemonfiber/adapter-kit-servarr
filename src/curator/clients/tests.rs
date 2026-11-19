@@ -183,10 +183,13 @@ async fn a_client_is_forgotten_by_deleting_its_id() {
 #[tokio::test]
 async fn an_id_the_service_never_assigns_is_forgotten_without_asking() {
     let fake = Fake::always(Answer::reply(200, ""));
-    assert!(television(&fake)
-        .forget_download_client("../system")
-        .await
-        .is_ok());
+    let curator = television(&fake);
+    for unassigned in ["../system", "0", "-3"] {
+        assert!(
+            curator.forget_download_client(unassigned).await.is_ok(),
+            "{unassigned}"
+        );
+    }
     assert!(asked(&fake).is_empty());
 }
 
