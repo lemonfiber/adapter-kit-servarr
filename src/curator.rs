@@ -19,6 +19,7 @@ mod grabs;
 mod importing;
 mod kind;
 mod pipeline;
+mod pulling;
 mod queue;
 mod releases;
 mod wire;
@@ -29,6 +30,8 @@ const ARTIST_ID: &str = "artistId";
 
 const COMMAND: &str = "/command";
 
+const INDEXERS: &str = "/indexer";
+
 const MONITORED: &str = "monitored";
 
 const THE_CATALOGUE: &str = "the catalogue";
@@ -36,6 +39,8 @@ const THE_CATALOGUE: &str = "the catalogue";
 const THE_EPISODES: &str = "the episodes";
 
 const THE_HISTORY: &str = "the history";
+
+const THE_INDEXERS: &str = "the indexers";
 
 const THE_LIBRARY: &str = "the library";
 
@@ -46,6 +51,8 @@ const THE_RELEASE_SEARCH: &str = "the release search";
 const THE_ROOT_FOLDERS: &str = "the root folders";
 
 const THE_WANTED_LIST: &str = "the wanted list";
+
+const UNTESTED: &str = "?forceSave=true";
 
 const QUALITY_PROFILES: &str = "/qualityprofile";
 

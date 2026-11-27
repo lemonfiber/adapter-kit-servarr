@@ -2,8 +2,9 @@
 
 **The client lemonfiber's Servarr adapters share.**
 Sonarr, Radarr, Lidarr and Prowlarr speak one HTTP API. This crate speaks it once:
-the keyed, versioned client, and `library.curate` as Sonarr, Radarr and Lidarr
-answer it.
+the keyed, versioned client, and `library.curate` and `indexer.pull` as Sonarr,
+Radarr and Lidarr answer them. `indexer.pull` reads NZBHydra2 as one Newznab
+indexer of the curator's own.
 
 ## How an adapter takes it
 

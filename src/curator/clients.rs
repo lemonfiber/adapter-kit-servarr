@@ -10,19 +10,18 @@ use lemonfiber_ports::Client;
 use super::wire::{ClientResource, FolderResource, ProfileResource, TestResource};
 use super::{
     Curator, Music, QUALITY_PROFILES, ROOT_FOLDERS, THE_QUALITY_PROFILES, THE_ROOT_FOLDERS,
+    UNTESTED,
 };
 
 const DOWNLOAD_CLIENTS: &str = "/downloadclient";
 
 const TEST_ALL: &str = "/downloadclient/testall";
 
-const SAVED_UNREACHED: &str = "/downloadclient?forceSave=true";
+pub(super) const FIELDS: &str = "fields";
 
-const FIELDS: &str = "fields";
+pub(super) const NAME: &str = "name";
 
-const NAME: &str = "name";
-
-const VALUE: &str = "value";
+pub(super) const VALUE: &str = "value";
 
 const PRIORITY: u8 = 1;
 
@@ -73,7 +72,11 @@ impl<M: Music> Client for Curator<M> {
     async fn register_download_client(&self, client: &DownloadClient) -> Result<(), Failure> {
         let body = self.download_client_body(client, None)?;
         self.servarr
-            .done(Method::Post, SAVED_UNREACHED, Some(body))
+            .done(
+                Method::Post,
+                &format!("{DOWNLOAD_CLIENTS}{UNTESTED}"),
+                Some(body),
+            )
             .await
     }
 
@@ -250,7 +253,7 @@ impl<M: Music> Curator<M> {
     }
 }
 
-fn set_field(fields: &mut Vec<serde_json::Value>, field: &str, value: Option<&str>) {
+pub(super) fn set_field(fields: &mut Vec<serde_json::Value>, field: &str, value: Option<&str>) {
     let named = |held: &serde_json::Value| {
         held.get(NAME).and_then(serde_json::Value::as_str) == Some(field)
     };
