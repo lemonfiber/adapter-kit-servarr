@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use lemonfiber_manifest::ApiKind;
 use lemonfiber_ports::http::Method;
 use lemonfiber_ports::service::{AggregatorAt, Failure, KnownAggregator, PullsIndexers};
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use super::clients::{set_field, FIELDS, NAME, VALUE};
 use super::{Curator, Music, INDEXERS, THE_INDEXERS, UNTESTED};
@@ -44,7 +44,9 @@ fn text<'a>(value: &'a Value, key: &str) -> &'a str {
     value.get(key).and_then(Value::as_str).unwrap_or_default()
 }
 
-fn field<'a>(entry: &'a Value, name: &str) -> &'a str {
+type Entry = Map<String, Value>;
+
+fn field<'a>(entry: &'a Entry, name: &str) -> &'a str {
     entry
         .get(FIELDS)
         .and_then(Value::as_array)
@@ -53,21 +55,21 @@ fn field<'a>(entry: &'a Value, name: &str) -> &'a str {
         .unwrap_or_default()
 }
 
-fn newznab(entry: &Value) -> bool {
-    text(entry, IMPLEMENTATION) == NEWZNAB
+fn newznab(entry: &Entry) -> bool {
+    entry.get(IMPLEMENTATION).and_then(Value::as_str) == Some(NEWZNAB)
 }
 
-fn switched_on(entry: &Value) -> bool {
+fn switched_on(entry: &Entry) -> bool {
     SWITCHES
         .iter()
         .any(|switch| entry.get(*switch).and_then(Value::as_bool) == Some(true))
 }
 
-fn at_url(entry: &Value, url: &str) -> bool {
+fn at_url(entry: &Entry, url: &str) -> bool {
     field(entry, BASE_URL).trim_end_matches('/') == url.trim_end_matches('/')
 }
 
-fn known(entry: &Value) -> Option<KnownAggregator> {
+fn known(entry: &Entry) -> Option<KnownAggregator> {
     let url = field(entry, BASE_URL);
     let id = entry.get(ID).and_then(Value::as_i64)?;
     (!url.is_empty()).then(|| KnownAggregator {
@@ -77,43 +79,43 @@ fn known(entry: &Value) -> Option<KnownAggregator> {
     })
 }
 
-fn switched(entry: &mut Value, on: bool) {
-    if let Some(entry) = entry.as_object_mut() {
-        for switch in SWITCHES {
-            entry.insert(switch.to_owned(), Value::Bool(on));
-        }
+fn switched(entry: &mut Entry, on: bool) {
+    for switch in SWITCHES {
+        entry.insert(switch.to_owned(), Value::Bool(on));
     }
 }
 
 impl<M: Music> Curator<M> {
-    fn settings<'a>(&self, entry: &'a mut Value) -> Result<&'a mut Vec<Value>, Failure> {
+    fn settings<'a>(&self, entry: &'a mut Entry) -> Result<&'a mut Vec<Value>, Failure> {
         entry
             .get_mut(FIELDS)
             .and_then(Value::as_array_mut)
             .ok_or_else(|| self.servarr.endpoint().refused(NO_SETTINGS))
     }
 
-    async fn held_indexers(&self) -> Result<Vec<Value>, Failure> {
+    async fn held_indexers(&self) -> Result<Vec<Entry>, Failure> {
         self.servarr.read(INDEXERS, THE_INDEXERS).await
     }
 
-    async fn made(&self, aggregator: &AggregatorAt) -> Result<Value, Failure> {
-        let schema: Vec<Value> = self.servarr.read(SCHEMA, "the indexers it offers").await?;
+    async fn made(&self, aggregator: &AggregatorAt) -> Result<Entry, Failure> {
+        let schema: Vec<Entry> = self.servarr.read(SCHEMA, "the indexers it offers").await?;
         let mut entry = schema
             .into_iter()
             .find(newznab)
             .ok_or_else(|| self.servarr.unsupported(NO_NEWZNAB))?;
-        if let Some(entry) = entry.as_object_mut() {
-            entry.remove(PRESETS);
-            entry.insert(NAME.to_owned(), Value::from(aggregator.name.as_str()));
-        }
+        entry.remove(PRESETS);
+        entry.insert(NAME.to_owned(), Value::from(aggregator.name.as_str()));
         switched(&mut entry, false);
         let settings = self.settings(&mut entry)?;
         set_field(settings, BASE_URL, Some(&aggregator.url));
         set_field(settings, API_KEY, Some(&aggregator.key));
         let response = self
             .servarr
-            .ask(Method::Post, INDEXERS, Some(entry.to_string()))
+            .ask(
+                Method::Post,
+                INDEXERS,
+                Some(Value::Object(entry).to_string()),
+            )
             .await?;
         self.servarr.endpoint().decode(&response, UNNAMED)
     }
@@ -145,7 +147,7 @@ impl<M: Music> PullsIndexers for Curator<M> {
             None => self.made(aggregator).await?,
         };
         let id = entry
-            .get("id")
+            .get(ID)
             .and_then(Value::as_i64)
             .ok_or_else(|| self.servarr.endpoint().refused(UNNAMED))?;
         switched(&mut entry, true);
@@ -154,7 +156,7 @@ impl<M: Music> PullsIndexers for Curator<M> {
             .done(
                 Method::Put,
                 &format!("{INDEXERS}/{id}{UNTESTED}"),
-                Some(entry.to_string()),
+                Some(Value::Object(entry).to_string()),
             )
             .await
     }
