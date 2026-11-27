@@ -9,11 +9,9 @@ use serde_json::{json, Map, Value};
 use super::kind::Shape as _;
 use super::wire::ProfileResource;
 use super::{
-    Curator, Music, MONITORED, QUALITY_PROFILES, ROOT_FOLDERS, THE_CATALOGUE, THE_QUALITY_PROFILES,
-    THE_ROOT_FOLDERS,
+    Curator, Music, INDEXERS, MONITORED, QUALITY_PROFILES, ROOT_FOLDERS, THE_CATALOGUE,
+    THE_INDEXERS, THE_QUALITY_PROFILES, THE_ROOT_FOLDERS,
 };
-
-const INDEXERS: &str = "/indexer";
 
 const TERM: &str = "term";
 
@@ -124,7 +122,7 @@ impl<M: Music> Catalogue for Curator<M> {
     }
 
     async fn indexer_count(&self) -> Result<usize, Failure> {
-        let indexers: Vec<IndexerResource> = self.servarr.read(INDEXERS, "the indexers").await?;
+        let indexers: Vec<IndexerResource> = self.servarr.read(INDEXERS, THE_INDEXERS).await?;
         Ok(indexers
             .into_iter()
             .filter(|indexer| indexer.enable_automatic_search || indexer.enable_interactive_search)

@@ -1,6 +1,6 @@
 //! The client lemonfiber's Sonarr, Radarr, Lidarr and Prowlarr adapters share: the
-//! keyed, versioned Servarr client, and `library.curate` as Sonarr, Radarr and Lidarr
-//! answer it.
+//! keyed, versioned Servarr client, and `library.curate` and `indexer.pull` as Sonarr,
+//! Radarr and Lidarr answer them.
 
 pub mod client;
 pub mod credential;
